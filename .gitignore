@@ -1,0 +1,19 @@
+# Python / Jupyter
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints
+.env
+.venv/
+env/
+venv/
+
+# Large datasets / archives
+*.zip
+*.tar.gz
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
