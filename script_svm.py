@@ -1,6 +1,7 @@
 """
 Experimento SVM: Predicción de Deserción Estudiantil sobre Dataset Sintético (11,500 Estudiantes)
 - EDA Completo de Variables Socioeconómicas y Académicas
+- Flujo Reproducible Sin Fuga de Datos (Scikit-Learn Pipeline + ColumnTransformer)
 - Evaluación de Normalizaciones vs Baseline (Sin Normalizar) utilizando n_jobs=2
 - Importancia de Variables en la Clasificación (Permutation Importance con n_jobs=2)
 - Visualización del Hiperplano, Márgenes de Decisión y Vectores de Soporte
@@ -18,9 +19,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, dump
 
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
 from sklearn.svm import SVC
 from sklearn.decomposition import PCA
 from sklearn.inspection import permutation_importance
@@ -30,7 +33,7 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import (
     StandardScaler, MinMaxScaler, MaxAbsScaler,
-    QuantileTransformer, PowerTransformer, OrdinalEncoder, OneHotEncoder
+    QuantileTransformer, PowerTransformer, OrdinalEncoder, OneHotEncoder, FunctionTransformer
 )
 from scipy.stats import ttest_ind
 
@@ -55,7 +58,7 @@ df = pd.read_csv(data_path)
 print(f"Dimensiones del dataset: {df.shape[0]} estudiantes y {df.shape[1]} variables.", flush=True)
 print(f"Valores nulos totales en el dataset: {df.isnull().sum().sum()}", flush=True)
 
-# Definir la variable objetivo binaria de deserción basada en riesgo académico y socioeconómico
+# Formulación del evento binario de deserción
 riesgo = (
     (df['promedio_academico'] < 3.0).astype(int) * 2.5 +
     (df['materias_reprobadas'] >= 2).astype(int) * 2.5 +
@@ -66,7 +69,7 @@ riesgo = (
 )
 df['desercion'] = (riesgo >= 3.5).astype(int)
 
-# Preprocesamiento de variables categóricas para la matriz X
+# Identificación de columnas categóricas y numéricas crudas
 cat_cols = ['sexo', 'estado_civil', 'zona_residencia', 'departamento',
             'nivel_educativo_padre', 'nivel_educativo_madre', 'sector_ies',
             'nivel_formacion', 'metodologia', 'area_conocimiento']
@@ -76,12 +79,7 @@ num_cols = ['edad_ingreso', 'promedio_academico', 'materias_reprobadas',
             'estrato_socioeconomico', 'anio_registro', 'trabaja_mientras_estudia',
             'beneficiario_icetex', 'beneficiario_beca']
 
-ohe = OneHotEncoder(sparse_output=False, drop='first', handle_unknown='ignore')
-X_cat_encoded = ohe.fit_transform(df[cat_cols])
-cat_feature_names = ohe.get_feature_names_out(cat_cols)
-
-X_num = df[num_cols].values
-X_raw = pd.DataFrame(np.hstack([X_num, X_cat_encoded]), columns=num_cols + list(cat_feature_names))
+X_raw = df[num_cols + cat_cols]
 y = df['desercion'].values
 
 print("\nDistribución de la Variable Objetivo 'desercion' (1 = Desertor, 0 = No Desertor):", flush=True)
@@ -101,12 +99,11 @@ for p in axes[0].patches:
                      (p.get_x() + p.get_width() / 2., p.get_height() / 2),
                      ha='center', va='center', fontsize=11, color='white', fontweight='bold')
 
-correlations = X_raw.apply(lambda col: col.corr(pd.Series(y))).sort_values()
-top_corr = pd.concat([correlations.head(5), correlations.tail(5)])
-
-colors = ['#d95f02' if c > 0 else '#7570b3' for c in top_corr.values]
-axes[1].barh(top_corr.index, top_corr.values, color=colors)
-axes[1].set_title('Top Variables Correlacionadas con Deserción (Sintético)', fontsize=14, fontweight='bold')
+# Matriz correlacional numérica pura
+correlations = df[num_cols].apply(lambda col: col.corr(pd.Series(y))).sort_values()
+colors = ['#d95f02' if c > 0 else '#7570b3' for c in correlations.values]
+axes[1].barh(correlations.index, correlations.values, color=colors)
+axes[1].set_title('Correlación de Pearson de Variables Numéricas con Deserción', fontsize=14, fontweight='bold')
 axes[1].set_xlabel('Coeficiente de Correlación de Pearson', fontsize=12)
 axes[1].axvline(0, color='black', linestyle='--', linewidth=0.8)
 
@@ -139,11 +136,11 @@ print(f"[OK] Gráfico de variables clave guardado en: {fig_box_path}", flush=Tru
 
 
 # ==========================================
-# 2. DEFINICIÓN DE NORMALIZADORES Y BASELINE
+# 2. FLUJO REPRODUCIBLE SIN FUGA DE DATOS (PIPELINE)
 # ==========================================
 print("\n=========================================================")
-print("2. EVALUACIÓN DE NORMALIZACIÓN VS BASELINE (SIN NORMALIZAR)")
-print("   (Ejecución paralela con n_jobs=2)")
+print("2. FLUJO REPRODUCIBLE SIN FUGA DE DATOS (PIPELINES + COLUMNTRANSFORMER)")
+print("   (Ejecución paralela multihilo con n_jobs=2)")
 print("=========================================================", flush=True)
 
 normalization_methods = {
@@ -152,40 +149,53 @@ normalization_methods = {
     'Quantile Transformer': QuantileTransformer(n_quantiles=50, random_state=42, output_distribution='uniform'),
     'Max Absolute Scaler': MaxAbsScaler(),
     'Power Transformer': PowerTransformer(method='yeo-johnson'),
-    'No Normalization (Baseline)': None
+    'No Normalization (Baseline)': FunctionTransformer(validate=False)  # Identidad sin escalar
 }
 
 N_TRIALS = 10
-N_JOBS = 2  # Usar 2 núcleos del procesador
+N_JOBS = 2  # 2 núcleos de procesador
 
 def evaluate_single_trial(trial_idx):
-    """Ejecuta una iteración de split y evalúa todos los escaladores para SVM."""
+    """
+    Ejecuta una partición train_test_split y evalúa cada PIPELINE estrictamente ajustado en train.
+    PREVIENE LA FUGA DE DATOS (DATA LEAKAGE) al no tocar test durante fit().
+    """
     X_train, X_test, y_train, y_test = train_test_split(
         X_raw, y, test_size=0.2, random_state=42 + trial_idx, stratify=y
     )
     
     trial_scores = {}
-    for method_name, scaler in normalization_methods.items():
+    for method_name, num_scaler in normalization_methods.items():
         try:
-            if scaler is None:
-                X_tr, X_te = X_train.values, X_test.values
-            else:
-                scaler_inst = type(scaler)(**scaler.get_params())
-                X_tr = scaler_inst.fit_transform(X_train)
-                X_te = scaler_inst.transform(X_test)
+            # Re-instanciar el escalador para aislamiento completo por trial
+            num_scaler_inst = type(num_scaler)(**num_scaler.get_params()) if hasattr(num_scaler, 'get_params') else num_scaler
 
-            clf = SVC(kernel='rbf', C=1.0, cache_size=1000, max_iter=3000, random_state=42)
-            clf.fit(X_tr, y_train)
-            preds = clf.predict(X_te)
+            # ColumnTransformer ajustado estrictamente en X_train de esta partición
+            preprocessor = ColumnTransformer(
+                transformers=[
+                    ('num', num_scaler_inst, num_cols),
+                    ('cat', OneHotEncoder(drop='first', handle_unknown='ignore', sparse_output=False), cat_cols)
+                ]
+            )
+
+            # Pipeline completo: Preprocesamiento + SVM Estimador
+            pipeline = Pipeline(steps=[
+                ('preprocessor', preprocessor),
+                ('classifier', SVC(kernel='rbf', C=1.0, cache_size=1000, random_state=42))
+            ])
+
+            # Entrenar el Pipeline COMPLETO únicamente con datos de entrenamiento
+            pipeline.fit(X_train, y_train)
             
-            f1 = f1_score(y_test, preds)
-            trial_scores[method_name] = f1
+            # Predecir en datos de prueba no vistos
+            preds = pipeline.predict(X_test)
+            trial_scores[method_name] = f1_score(y_test, preds)
         except Exception as e:
             trial_scores[method_name] = np.nan
             
     return trial_scores
 
-print(f"Iniciando {N_TRIALS} iteraciones multihilo (n_jobs={N_JOBS})...", flush=True)
+print(f"Iniciando {N_TRIALS} iteraciones de Pipelines independientes (n_jobs={N_JOBS})...", flush=True)
 parallel_results = Parallel(n_jobs=N_JOBS, prefer="threads")(
     delayed(evaluate_single_trial)(t) for t in range(N_TRIALS)
 )
@@ -218,7 +228,7 @@ for method_name, scores in results.items():
 summary_df = pd.DataFrame(summary_rows).sort_values(by='Average F1 Score', ascending=False)
 
 print("\n" + "="*80)
-print("TABLA COMPARATIVA: PROMEDIO DE F1-SCORE TRAS ITERACIONES CON SVM (ESTUDIANTES SINTÉTICOS)")
+print("TABLA COMPARATIVA: PROMEDIO DE F1-SCORE (PIPELINES SIN FUGA DE DATOS)")
 print("="*80)
 print(summary_df.to_string(index=False, formatters={
     'Average F1 Score': '{:.4f}'.format,
@@ -236,9 +246,9 @@ barplot = sns.barplot(
     palette=colors_bar
 )
 
-plt.title('Desempeño SVM en Dataset Sintético (11,500): Normalización vs Baseline', fontsize=14, fontweight='bold')
+plt.title('Evaluación de Pipelines SVM sin Fuga de Datos: Escaladores vs Baseline', fontsize=14, fontweight='bold')
 plt.xlabel(f'F1-Score Promedio ({N_TRIALS} iteraciones)', fontsize=12)
-plt.ylabel('Método de Normalización', fontsize=12)
+plt.ylabel('Método de Normalización en Pipeline', fontsize=12)
 plt.xlim(0.4, 1.0)
 
 for p in barplot.patches:
@@ -255,7 +265,7 @@ print(f"[OK] Gráfico comparativo de baseline guardado en: {fig_baseline_path}",
 
 
 # ==========================================
-# 3. IMPORTANCIA DE VARIABLES Y SELECCIÓN
+# 3. IMPORTANCIA DE VARIABLES EN PIPELINE
 # ==========================================
 print("\n=========================================================")
 print("3. IMPORTANCIA DE VARIABLES TOMADAS POR EL MODELO SVM")
@@ -266,15 +276,28 @@ X_train, X_test, y_train, y_test = train_test_split(
     X_raw, y, test_size=0.2, random_state=42, stratify=y
 )
 
-scaler_best = StandardScaler()
-X_train_scaled = scaler_best.fit_transform(X_train)
-X_test_scaled = scaler_best.transform(X_test)
+best_preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', StandardScaler(), num_cols),
+        ('cat', OneHotEncoder(drop='first', handle_unknown='ignore', sparse_output=False), cat_cols)
+    ]
+)
 
-clf_svm = SVC(kernel='rbf', C=1.0, probability=True, cache_size=1000, random_state=42)
-clf_svm.fit(X_train_scaled, y_train)
+best_pipeline = Pipeline(steps=[
+    ('preprocessor', best_preprocessor),
+    ('classifier', SVC(kernel='rbf', C=1.0, probability=True, cache_size=1000, random_state=42))
+])
 
+best_pipeline.fit(X_train, y_train)
+
+# Exportar artefacto de modelo reproducible
+model_artifact_path = os.path.join(os.path.dirname(__file__), "Archivos", "svm_pipeline_reproducible.joblib")
+dump(best_pipeline, model_artifact_path)
+print(f"[OK] Pipeline completo serializado e imutable guardado en: {model_artifact_path}", flush=True)
+
+# Permutation Importance sobre el test set crudo usando el Pipeline completo
 perm_importance = permutation_importance(
-    clf_svm, X_test_scaled, y_test, n_repeats=5, random_state=42, n_jobs=N_JOBS
+    best_pipeline, X_test, y_test, n_repeats=5, random_state=42, n_jobs=N_JOBS
 )
 
 sorted_importances_idx = perm_importance.importances_mean.argsort()[::-1]
@@ -286,14 +309,14 @@ imp_df = pd.DataFrame({
     'Importance_Std': perm_importance.importances_std[sorted_importances_idx]
 })
 
-print("\nTop 10 Variables más influyentes para el modelo SVM:", flush=True)
+print("\nTop 10 Variables más influyentes para el Pipeline SVM:", flush=True)
 print(imp_df.head(10).to_string(index=False), flush=True)
 
 # FIGURA 4: Importancia de Variables
 plt.figure(figsize=(10, 8))
 top_15_imp = imp_df.head(15)
 plt.barh(top_15_imp['Feature'][::-1], top_15_imp['Importance_Mean'][::-1], color='#2b5c8f', xerr=top_15_imp['Importance_Std'][::-1])
-plt.title('Importancia de Variables en SVM (Permutation Importance - Dataset Sintético)', fontsize=14, fontweight='bold')
+plt.title('Importancia de Variables en Pipeline SVM (Permutation Importance)', fontsize=14, fontweight='bold')
 plt.xlabel('Disminución Promedio en F1-Score al Permutar Variable', fontsize=12)
 plt.tight_layout()
 fig_imp_path = os.path.join(OUTPUT_DIR, "svm_importancia_variables.png")
@@ -309,10 +332,14 @@ print("\n=========================================================")
 print("4. VISUALIZACIÓN DEL HIPERPLANO DE SEPARACIÓN DE SVM Y VECTORES DE SOPORTE")
 print("=========================================================", flush=True)
 
-# A. Visualización del Hiperplano en Espacio 2D de Componentes Principales (PCA)
+# Preprocesar matrices transformadas estrictamente
+X_train_trans = best_pipeline.named_steps['preprocessor'].transform(X_train)
+X_test_trans = best_pipeline.named_steps['preprocessor'].transform(X_test)
+
+# A. Visualización del Hiperplano en Espacio PCA 2D
 pca = PCA(n_components=2, random_state=42)
-X_train_pca = pca.fit_transform(X_train_scaled)
-X_test_pca = pca.transform(X_test_scaled)
+X_train_pca = pca.fit_transform(X_train_trans)
+X_test_pca = pca.transform(X_test_trans)
 
 svm_pca = SVC(kernel='rbf', C=1.0, random_state=42)
 svm_pca.fit(X_train_pca, y_train)
@@ -329,7 +356,6 @@ contours = plt.contour(xx, yy, Z, levels=[-1.0, 0.0, 1.0], linestyles=['--', '-'
                        colors=['#3182bd', '#e6550d', '#3182bd'], linewidths=[1.5, 2.5, 1.5])
 plt.clabel(contours, inline=True, fontsize=10, fmt={-1.0: 'Margen (-1)', 0.0: 'Hiperplano (0)', 1.0: 'Margen (+1)'})
 
-# Dibujar una muestra representativa de estudiantes
 sample_idx = np.random.choice(len(y_test), size=1000, replace=False)
 X_sample_pca = X_test_pca[sample_idx]
 y_sample = y_test[sample_idx]
@@ -355,7 +381,7 @@ plt.close()
 print(f"[OK] Gráfico del Hiperplano PCA guardado en: {fig_hyperplane_path}", flush=True)
 
 
-# B. Visualización en las 2 Variables Reales Más Importantes: promedio_academico vs materias_reprobadas
+# B. Visualización en las 2 Variables Reales Más Importantes
 top_2_feats = ['promedio_academico', 'materias_reprobadas']
 X_top2 = X_train[top_2_feats].values
 
@@ -406,7 +432,7 @@ print("\n=========================================================")
 print("5. ANÁLISIS DE LA CLASIFICACIÓN DE ESTUDIANTES POR EL MODELO")
 print("=========================================================", flush=True)
 
-y_pred = clf_svm.predict(X_test_scaled)
+y_pred = best_pipeline.predict(X_test)
 cm = confusion_matrix(y_test, y_pred)
 
 print("\nREPORTE DE CLASIFICACIÓN DETALLADO (TEST SET = 2,300 ESTUDIANTES):", flush=True)
@@ -416,7 +442,7 @@ acc = accuracy_score(y_test, y_pred)
 prec = precision_score(y_test, y_pred)
 rec = recall_score(y_test, y_pred)
 f1 = f1_score(y_test, y_pred)
-auc = roc_auc_score(y_test, clf_svm.predict_proba(X_test_scaled)[:, 1])
+auc = roc_auc_score(y_test, best_pipeline.predict_proba(X_test)[:, 1])
 
 print(f"Accuracy:  {acc:.4f}", flush=True)
 print(f"Precision: {prec:.4f}", flush=True)
@@ -433,8 +459,8 @@ sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False, ax=axes[0],
             annot_kws={'size': 14, 'weight': 'bold'})
 axes[0].set_title('Matriz de Confusión de Clasificación de Estudiantes', fontsize=14, fontweight='bold')
 
-fpr, tpr, _ = roc_curve(y_test, clf_svm.predict_proba(X_test_scaled)[:, 1])
-axes[1].plot(fpr, tpr, color='#e6550d', lw=2.5, label=f'SVM RBF (AUC = {auc:.4f})')
+fpr, tpr, _ = roc_curve(y_test, best_pipeline.predict_proba(X_test)[:, 1])
+axes[1].plot(fpr, tpr, color='#e6550d', lw=2.5, label=f'Pipeline SVM RBF (AUC = {auc:.4f})')
 axes[1].plot([0, 1], [0, 1], color='navy', lw=1.5, linestyle='--')
 axes[1].set_xlim([0.0, 1.0])
 axes[1].set_ylim([0.0, 1.05])
@@ -450,7 +476,7 @@ plt.close()
 print(f"[OK] Gráfico de Matriz de Confusión y ROC guardado en: {fig_eval_path}", flush=True)
 
 # FIGURA 6: Distribución de la Función de Decisión f(x) (Distancia al Hiperplano)
-decision_dist = clf_svm.decision_function(X_test_scaled)
+decision_dist = best_pipeline.decision_function(X_test)
 
 plt.figure(figsize=(10, 6))
 sns.histplot(decision_dist[y_test == 0], color='#2b83ba', kde=True, label='Estudiantes No Desertores', stat='density', alpha=0.5)
@@ -460,7 +486,7 @@ plt.axvline(0, color='black', linestyle='--', linewidth=2, label='Hiperplano f(x
 plt.axvline(1, color='gray', linestyle=':', linewidth=1.5, label='Margen +1')
 plt.axvline(-1, color='gray', linestyle=':', linewidth=1.5, label='Margen -1')
 
-plt.title('Distribución de Distancias Funcionales de Estudiantes al Hiperplano SVM', fontsize=14, fontweight='bold')
+plt.title('Distribución de Distancias Funcionales al Hiperplano (Pipeline Sin Fuga)', fontsize=14, fontweight='bold')
 plt.xlabel('Distancia Funcional f(x) = wᵀφ(x) + b', fontsize=12)
 plt.ylabel('Densidad de Estudiantes', fontsize=12)
 plt.legend(loc='upper right', frameon=True)
@@ -472,6 +498,6 @@ plt.close()
 print(f"[OK] Gráfico de Distribución de Distancia al Hiperplano guardado en: {fig_dist_path}", flush=True)
 
 print("\n=========================================================")
-print("PROCESO COMPLETADO CON ÉXITO SOBRE 11,500 ESTUDIANTES SINTÉTICOS.")
+print("PROCESO COMPLETADO CON ÉXITO: PIPELINES REPRODUCIBLES Y SIN FUGA DE DATOS.")
 print(f"Todas las imágenes de análisis han sido generadas en:\n{OUTPUT_DIR}")
 print("=========================================================", flush=True)
