@@ -1,0 +1,9 @@
+Normalization Method,Average F1 Score,Std Dev,P value
+Quantile Transformer,0.768608,0.020122,0.0
+Power Transformer,0.768291,0.022038,0.0
+One Hot Encoder,0.761331,0.022219,0.0
+Standard Scaler,0.759851,0.022169,0.0
+Min Max Scaler,0.734016,0.024641,0.0
+Max Absolute Scaler,0.733373,0.022985,0.0
+Ordinal Encoder,0.560473,0.021587,0.0
+No Normalization,0.0,0.0,1.0
