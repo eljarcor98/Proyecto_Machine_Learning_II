@@ -121,5 +121,25 @@ Las siguientes métricas corresponden a los valores originales calculados sobre 
    - Las variables indicadoras (`trabaja_mientras_estudia`, `beneficiario_icetex`, `beneficiario_beca`) operan estrictamente en la escala discreta 0 o 1.
 
 2. **Requisito Tecnico para SVM**:
-   - El algoritmo SVM con kernel RBF computa distancias entre vectores de características mediante la norma euclidiana $\|x - x'\|^2$.
+   - El algoritmo SVM con kernel RBF computa distancias entre vectores de características mediante la norma euclidiana $\|x - x me'\|^2$.
    - Sin una etapa previa de normalización o estandarización, las variables con rangos numéricos elevados dominan la norma euclidiana, lo que invalida la contribución de variables predictoras en rangos pequeños pero con alto valor explicativo (como el promedio académico).
+
+---
+
+## 5. Configuracion e Hiperparametros del Modelo SVM (`SVC`)
+
+Para el proceso de clasificación de deserción estudiantil se empleó el estimador `SVC` de Scikit-Learn con la siguiente configuración de hiperparámetros:
+
+```python
+SVC(kernel='rbf', C=1.0, gamma='scale', cache_size=1000, random_state=42)
+```
+
+### 5.1 Justificacion e Implicaciones de Cada Hiperparametro
+
+| Hiperparámetro | Valor Configurado | Razón de Elección | Implicaciones Técnicas en el Modelo |
+| :--- | :--- | :--- | :--- |
+| **`kernel`** | `'rbf'` (Radial Basis Function) | La separación entre estudiantes que desertan y permanecen no es linealmente separable. El kernel RBF mapea las características a un espacio de dimensión infinita mediante $K(x, x') = \exp(-\gamma \|x - x'\|^2)$. | Permite construir fronteras de decisión curvadas y complejas capaces de capturar interacciones no lineales entre variables socioeconómicas y académicas sin necesidad de calcular explícitamente combinaciones polinómicas. Requiere estrictamente que las variables estén normalizadas. |
+| **`C`** | `1.0` | Representa la constante de penalización en la formulación de margen blando (*Soft Margin*). Controla el balance entre maximizar la distancia del margen y minimizar las violaciones de clasificación. | Un valor de $C=1.0$ establece un equilibrio estándar. Evita tanto el sobreajuste (*overfitting*, que ocurriría con $C \gg 1.0$ al tratar de clasificar perfectamente todo el ruido) como el subajuste (*underfitting*, que ocurriría con $C \ll 1.0$ al generar un margen demasiado permisivo). |
+| **`gamma`** | `'scale'` | Ajusta el ancho de banda de la función gaussiana RBF dinámicamente como $\gamma = \frac{1}{n\_features \cdot \text{Var}(X)}$. | Garantiza que el alcance de influencia de los vectores de soporte individuales sea proporcional a la escala global de las características transformadas, evitando la creación de "islas" muy localizadas o fronteras excesivamente suaves. |
+| **`cache_size`**| `1000` (MB) | Reserva 1,000 MB de memoria RAM dedicados al almacenamiento en caché de la matriz de producto interno del kernel (Matriz Gram). | Optimiza significativamente la velocidad de ejecución y reduce el tiempo de entrenamiento del problema de Programación Cuadrática (QP) en 11,500 datos sin alterar los resultados matemáticos del modelo. |
+| **`random_state`** | `42` | Fija la semilla del generador numérico pseudo-aleatorio. | Garantiza la reproducibilidad matemática exacta de los hiperplanos entrenados y de los resultados de evaluación a través de las distintas ejecuciones y experimentos. |
