@@ -1,9 +1,11 @@
-Normalization Method,Average F1 Score,Std Dev,P value
-Quantile Transformer,0.768608,0.020122,0.0
-Power Transformer,0.768291,0.022038,0.0
-One Hot Encoder,0.761331,0.022219,0.0
-Standard Scaler,0.759851,0.022169,0.0
-Min Max Scaler,0.734016,0.024641,0.0
-Max Absolute Scaler,0.733373,0.022985,0.0
-Ordinal Encoder,0.560473,0.021587,0.0
-No Normalization,0.0,0.0,1.0
+Normalization Method,Average F1 Score,Std Dev,F1 Delta vs Baseline,T-Statistic,P-Value
+Ordinal Encoder,0.909996,0.004537,0.052289,27.314,0.0
+Scale (Robust),0.909278,0.004735,0.051571,26.802,0.0
+Quantile Transformer,0.89826,0.004625,0.040553,21.136,0.0
+One Hot Scaler,0.891477,0.005545,0.033769,17.161,0.0
+Min Max Scaler,0.891477,0.005545,0.033769,17.161,0.0
+Max Absolute Scaler,0.890297,0.004966,0.032589,16.833,0.0
+Label Encoder,0.875512,0.004951,0.017805,9.2,0.0
+No Normalization,0.857708,0.012609,0.0,0.0,1.0
+Standard Scaler,0.855649,0.006523,-0.002058,-1.015,0.313486
+Power Transformer,0.851127,0.005637,-0.00658,-3.335,0.001386
