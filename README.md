@@ -107,7 +107,7 @@ Las siguientes métricas corresponden a los valores originales calculados sobre 
 | `estrato_socioeconomico` | 2.61 | 1.20 | 1.00 | 2.00 | 2.00 | 3.00 | 6.00 | `[1.00 - 6.00]` |
 | `anio_registro` | 2023.31 | 1.27 | 2021.00 | 2022.00 | 2023.00 | 2024.00 | 2025.00 | `[2021.00 - 2025.00]` |
 | `trabaja_mientras_estudia` | 0.38 | 0.48 | 0.00 | 0.00 | 0.00 | 1.00 | 1.00 | `[0.00 - 1.00]` |
-| `beneficiario_icetex` | 0.22 | 0.41 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | `[0.00 - 1.00]` |
+| `beneficiario_icetex` | 0.22 | 0.41 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | `[0.22 - 1.00]` |
 | `beneficiario_beca` | 0.19 | 0.39 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | `[0.00 - 1.00]` |
 
 ---
@@ -123,3 +123,47 @@ Las siguientes métricas corresponden a los valores originales calculados sobre 
 2. **Requisito Tecnico para SVM**:
    - El algoritmo SVM con kernel RBF computa distancias entre vectores de características mediante la norma euclidiana $\|x - x'\|^2$.
    - Sin una etapa previa de normalización o estandarización, las variables con rangos numéricos elevados dominan la norma euclidiana, lo que invalida la contribución de variables predictoras en rangos pequeños pero con alto valor explicativo (como el promedio académico).
+
+---
+
+## 5. Configuracion e Hiperparametros del Modelo SVM (`SVC`)
+
+Para el proceso de clasificación de deserción estudiantil se empleó el estimador `SVC` de Scikit-Learn con la siguiente configuración de hiperparámetros:
+
+```python
+SVC(kernel='rbf', C=1.0, gamma='scale', cache_size=1000, random_state=42)
+```
+
+### 5.1 Justificacion e Implicaciones de Cada Hiperparametro
+
+| Hiperparámetro | Valor Configurado | Razón de Elección | Implicaciones Técnicas en el Modelo |
+| :--- | :--- | :--- | :--- |
+| **`kernel`** | `'rbf'` (Radial Basis Function) | La separación entre estudiantes que desertan y permanecen no es linealmente separable. El kernel RBF mapea las características a un espacio de dimensión infinita mediante $K(x, x') = \exp(-\gamma \|x - x'\|^2)$. | Permite construir fronteras de decisión curvadas y complejas capaces de capturar interacciones no lineales entre variables socioeconómicas y académicas sin necesidad de calcular explícitamente combinaciones polinómicas. Requiere estrictamente que las variables estén normalizadas. |
+| **`C`** | `1.0` | Representa la constante de penalización en la formulación de margen blando (*Soft Margin*). Controla el balance entre maximizar la distancia del margen y minimizar las violaciones de clasificación. | Un valor de $C=1.0$ establece un equilibrio estándar. Evita tanto el sobreajuste (*overfitting*, que ocurriría con $C \gg 1.0$ al tratar de clasificar perfectamente todo el ruido) como el subajuste (*underfitting*, que ocurriría con $C \ll 1.0$ al generar un margen demasiado permisivo). |
+| **`gamma`** | `'scale'` | Ajusta el ancho de banda de la función gaussiana RBF dinámicamente como $\gamma = \frac{1}{n\_features \cdot \text{Var}(X)}$. | Garantiza que el alcance de influencia de los vectores de soporte individuales sea proporcional a la escala global de las características transformadas, evitando la creación de "islas" muy localizadas o fronteras excesivamente suaves. |
+| **`cache_size`**| `1000` (MB) | Reserva 1,000 MB de memoria RAM dedicados al almacenamiento en caché de la matriz de producto interno del kernel (Matriz Gram). | Optimiza significativamente la velocidad de ejecución y reduce el tiempo de entrenamiento del problema de Programación Cuadrática (QP) en 11,500 datos sin alterar los resultados matemáticos del modelo. |
+| **`random_state`** | `42` | Fija la semilla del generador numérico pseudo-aleatorio. | Garantiza la reproducibilidad matemática exacta de los hiperplanos entrenados y de los resultados de evaluación a través de las distintas ejecuciones y experimentos. |
+
+---
+
+## 6. Metodos de Normalizacion y Transformacion Evaluados (Segun Articulo IEEE 2024)
+
+De acuerdo con la metodología expuesta en el artículo científico (*Support Vector Machine for Predicting Student Dropout Under Different Normalization Methods*, IEEE 2024), se evalúa el comportamiento de SVM al aplicar distintas técnicas de transformación y escalamiento de características.
+
+### 6.1 Descripcion Matematica y Operativa de Cada Metodo
+
+| Método de Normalización | Fórmula / Transformación Matemática | Descripción Operativa y Comportamiento | Efecto en la Frontera de Decisión de SVM |
+| :--- | :--- | :--- | :--- |
+| **`StandardScaler`** | $z = \frac{x - \mu}{\sigma}$ | Resta la media ($\mu$) y divide entre la desviación estándar ($\sigma$). Transforma los datos para tener media 0 y varianza 1 ($\mu=0, \sigma=1$). | Preserva la relación lineal original de las variables mientras iguala su dispersión. Es la opción estándar óptima cuando las características numéricas tienen distribuciones aproximadamente gaussianas. |
+| **`MinMaxScaler`** | $x' = \frac{x - x_{\min}}{x_{\max} - x_{\min}}$ | Escala linealmente todas las características a un rango acotado estricto, típicamente $[0, 1]$. | Mantiene la forma exacta de la distribución original. Sensible a valores atípicos (*outliers*) extremos, ya que $x_{\min}$ y $x_{\max}$ determinan los límites absolutos. |
+| **`MaxAbsScaler`** | $x' = \frac{x}{|x_{\max}|}$ | Escala cada característica dividiendo por su valor absoluto máximo, mapeando los datos al rango $[-1, 1]$. | No desplaza el centro de los datos (no resta la media), por lo que preserva la estructura de ceros explícitos (*sparsity*). |
+| **`QuantileTransformer`** | $x' = G^{-1}(F_{emp}(x))$ | Aplica una transformación no paramétrica basada en la función de distribución acumulada empírica (ECDF) a cuantiles. | Mapea las características a una distribución uniforme o normal. Atenúa el impacto de valores atípicos y distribuciones fuertemente sesgadas, suavizando las distancias euclidianas. |
+| **`PowerTransformer`** *(Yeo-Johnson)* | Transformación de potencia estocástica para estabilizar varianza y minimizar *skewness*. | Transforma las características numéricas no gaussianas para hacerlas lo más cercanas posible a una distribución normal estándar. | Corrige la asimetría en distribuciones sesgadas. En los experimentos empíricos con SVM, este método alcanzó uno de los desempeños más altos ($F1 \approx 0.9085$). |
+| **`No Normalization`** *(Baseline)* | $x' = x$ | Mantiene las variables crudas en sus unidades y escalas originales (sin transformación). | Punto de comparación baseline. Provoca una falla severa en el algoritmo SVM ($F1 = 0.0$ o muy bajo) debido a la dominancia desproporcionada de variables con amplitudes grandes. |
+
+### 6.2 Impacto de Codificadores Categóricos Evaluados en el Artículo
+
+| Codificador | Operación | Impacto en SVM |
+| :--- | :--- | :--- |
+| **`OneHotEncoder`** | Convierte variables categóricas en vectores binarios indicadoras (0 o 1). | Método recomendado para variables nominales sin orden inherente. Evita introducir jerarquías artificiales que distorsionen el cálculo de distancias en SVM. |
+| **`OrdinalEncoder` / `LabelEncoder`** | Asigna valores enteros secuenciales ($0, 1, 2, \dots$) a las categorías. | Solo aplicable si existe un orden jerárquico real. Si se aplica a variables nominales, introduce relaciones de orden inexistentes que penalizan el rendimiento del hiperplano ($F1 \approx 0.50$ según el artículo). |
