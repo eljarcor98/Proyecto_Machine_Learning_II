@@ -1,0 +1,139 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{csquotes}
+\usepackage{setspace}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\onehalfspacing
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!80!black,
+    citecolor=blue!80!black,
+    urlcolor=blue!80!black,
+    pdftitle={Análisis y detección de anomalías de red a partir del conjunto de datos NSL-KDD-Dataset},
+    pdfauthor={Arnold Santiago Torres Anzola, Sara López Chavarro, Nicolas Felipe Figueroa Salgado}
+}
+
+\title{\textbf{\Large Análisis y detección de anomalías de red a partir del conjunto de datos NSL-KDD-Dataset} \\
+\vspace{0.3cm}
+\large Machine Learning II}
+
+\author{
+    \textbf{Arnold Santiago Torres Anzola} \\
+    \textbf{Sara López Chavarro} \\
+    \textbf{Nicolas Felipe Figueroa Salgado} \\[0.4cm]
+    \small Universidad Externado de Colombia \\
+    \small Departamento de Matemáticas \\
+    \small Programa de Ciencia de Datos \\
+    \small Bogotá, 2026
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\vspace{0.5cm}
+
+\section{Planteamiento del problema}
+
+Con la creciente evolución de internet, el aumento del tráfico de datos y la interconexión entre dispositivos, se presentan amenazas que pueden afectar el funcionamiento de los dispositivos con acceso a la red. Con el aumento en el uso mundial del IoT (\textit{Internet of Things}), el tráfico de datos en la cotidianidad y el incremento en el uso de tecnologías avanzadas, la ciberseguridad, expresa Sharma (2024), se ha convertido en una necesidad y tema de estudio imperante:
+
+\begin{quote}
+``En los últimos años, IoT ha ido ganando popularidad y, con el avance de las tecnologías, Internet y los macrodatos, la seguridad se ha vuelto esencial para las redes IoT. Los investigadores prestan atención al sistema de detección de intrusiones para redes IoT con el fin de detectar actividades maliciosas.'' \cite[pág.~1]{sharma2024explainable}
+\end{quote}
+
+Cuando se habla de ciberseguridad esta refiere a la prevención y detección temprana de ataques informáticos. Para cumplir su finalidad, esta busca implementar sistemas de detección que permitan clasificar el tipo de ataque. En ese sentido, existen ``Sistemas tradicionales de detección de intrusos en la red que clasifican las amenazas mediante la detección de malos usos [o uso malicioso], y la detección de anomalías en los registros de tráfico de red'' \cite[pág.~191]{ullah2024ids}. Cuando se hace referencia a los malos usos, se habla de la explotación de vulnerabilidades presentes en los dispositivos, ``utilizado la concordancia normativa o la concordancia de características para determinar si los datos son una intrusión'' \cite[pág.~191]{ullah2024ids}. En este tipo de amenaza se encuentran las transferencias de datos maliciosos, intentos de fraude, la suplantación de identidad o intrusiones en la red.
+
+Por otro lado, la detección de anomalías ``implica la identificación de datos y situaciones fuera de lo normal en el contexto del tráfico de red'' \cite[pág.~191]{ullah2024ids}. Entre ellas se encuentran las detecciones de anomalías lógicas, como pueden ser los picos en la red o múltiples inicios de sesión erróneos, y también, expresan Naeem, Ullah \& Srivastava (2024), los de carácter físico que pueden ser detectados por telemetría, como las condiciones externas referentes a golpes, temperatura o clima adversos.
+
+Sin embargo, existen inconvenientes en torno a las bajas tasas de detección de estas amenazas e, incluso, una alta tasa de falsas alarmas presentes en los sistemas tradicionales de detección \cite[pág.~1]{alhawawreh2024explainable}. El inconveniente radica en el proceso de recopilación y procesamiento de dicha información, puesto que se desarrolla de manera manual, la pérdida de información relevante es recurrente y existe posibilidad de no encontrar información sobre los ataques: ``ya que una cantidad significativa de los datos extraídos no cuenta con una descripción clara ni proporciona información relevante sobre los ataques. Además, debido al proceso manual, se omite información factual y patrones de ataque importantes'' \cite[pág.~1]{alhawawreh2024explainable}.
+
+Con la evolución de tecnologías como la Inteligencia Artificial, el aprendizaje de máquina (\textit{Machine Learning}) y el aprendizaje profundo (\textit{Deep Learning}), se ha encontrado una ventana de oportunidad para la investigación de ataques a la red en base a estas herramientas. A partir de esta información, muchos investigadores han empezado a optar por el uso de estas técnicas, tanto el \textit{Deep Learning} como el \textit{Machine Learning}, para la detección de amenazas en la red \cite[pág.~2]{sharma2024explainable}. Estas herramientas pueden analizar una alta demanda de datos en poco tiempo y, además, pretenden reducir la tasa de errores producto de la intervención manual de los archivos de estudio. En ese sentido, facilitan el manejo de grandes volúmenes de información y pretenden disminuir la pérdida de información producto de la intervención manual. De esta manera, que la implementación de estas herramientas permita una correcta clasificación y detección de anomalías, deja abierta una puerta de investigación frente a los modelos a implementar mediante el uso de estas técnicas para la detección de ataques en la red.
+
+Trabajos como los de Matthew G. y Gaber (2024), dan insumos claves frente al comportamiento positivo al analizar y detectar tráfico genuino sobre una red. Investigaciones como las de Ullah, F et al. (2024) dan una aproximación detallada de las amenazas presentadas en una magnitud importante de datos, tanto físicos y lógicos, en centrales de distribución de energía. Sharma (2024) habla de por qué la detección de amenazas resulta importante para la operación de equipos, además de la implementación de modelos de aprendizaje para aproximar los datos recibidos al tipo de ataque realizado. En la medida que existe un campo investigativo que hay que socavar, y la posibilidad de un análisis amplio de datos mediante estas herramientas producto de las tecnologías IA, este trabajo pretende realizar una revisión de literatura investigativa y un análisis de posibles técnicas para la identificación de amenazas en las redes de datos.
+
+\section{Justificación}
+
+La detección de amenazas se ha convertido en una prioridad en los últimos años. Con la creciente masificación de dispositivos interconectados se hace relevante la detección de amenazas y vulnerabilidades de la red en tiempo real \cite[pág.~1]{alhawawreh2024explainable}. En la medida que las cosas se encuentran interconectadas por medio de sistemas de red, es un problema que se den vulnerabilidades en grandes sistemas de información. Sin embargo, actualmente los sistemas tradicionales de detección de ataques de red resultan insuficientes y poco eficaces a la hora de dar un análisis efectivo de información sobre ataques en la red. El mayor inconveniente con el tipo de análisis es el masivo volumen de datos que debe ser analizado:
+
+\begin{quote}
+``Los sistemas empresariales generan con frecuencia un volumen sustancial de registros para rastrear el estado de ejecución y las actividades, así como datos del tráfico de la red. Tradicionalmente, la detección de intrusiones requiere el análisis de datos de red no estructurados mediante el procesamiento de archivos Packet Capture (PCAP). Dichos datos pueden contener información útil sobre ataques específicos, como el nombre del ataque, referencias, información del host, entre otros.'' \cite[pág.~1]{ullah2024ids}
+\end{quote}
+
+Sin embargo, pese a tener información útil, el procesamiento manual de estos datos puede incurrir en pérdidas de información por fallos humanos contingentes.
+
+Por sí mismos los sistemas de detección de ataques no son inútiles, pero, debido a la susceptibilidad de pérdida de información por su manejo manual, resultan ineficientes para manejar volúmenes altos de información en tiempo real. Por dichos motivos, es necesario implementar nuevas herramientas que faciliten y automaticen el análisis de dicha información, como ``las técnicas de aprendizaje automático (ML) y aprendizaje profundo (DL) pueden manejar de manera efectiva datos de gran volumen, heterogéneos y complejos, permitiendo la extracción automática de patrones ocultos de ataques y la identificación de correlaciones entre diferentes puntos de datos de telemetría'' \cite[pág.~2]{alhawawreh2024explainable}. Estas tecnologías pueden manejar eficazmente grandes volúmenes de datos heterogéneos y complejos, identificar patrones ocultos de ataques y encontrar correlaciones entre diferentes puntos de datos.
+
+Cuando se procesan datos mediante sistemas tradicionales, estos operan mediante algoritmos que requieren una interpretación especializada:
+
+\begin{quote}
+``dado que estos algoritmos operan como una ``caja negra'' y no es posible extraer directamente dichos patrones, [por ello] se recurre al concepto de inteligencia artificial explicable (XAI) para extraer este conocimiento y mapearlo a información procesable sobre ataques.'' \cite[pág.~2]{alhawawreh2024explainable}
+\end{quote}
+
+Por tal motivo, se vuelve necesaria la interpretación por parte de mecanismos de IA, los cuales ayudan a la obtención, interpretación, análisis y toma de decisiones, frente a posibles técnicas para la identificación de amenazas en las redes de datos.
+
+\section{Pregunta de investigación}
+
+¿Es posible implementar un sistema automatizado basado en aprendizaje profundo para detectar y prevenir ataques en tiempo real mediante el análisis de anomalías en datos de red heterogéneos y complejos?
+
+\section{Objetivos}
+
+\subsection{General}
+Investigar la posibilidad de detectar ataques en redes de datos a partir de datos anómalos y mediante la recopilación de datos en tiempo real.
+
+\subsection{Específicos}
+\begin{itemize}
+    \item Analizar las características y patrones asociados con ataques de red como malware evasivo y amenazas persistentes avanzadas en tráfico, cifrado y logs de red en el conjunto de datos ``NSL-KDD-Dataset''.
+    \item Explorar las técnicas avanzadas de análisis de datos utilizadas actualmente para detectar anomalías en tráfico cifrado y logs de red, enfocándose en su aplicabilidad frente a ataques sofisticados mediante el conjunto de datos ``NSL-KDD-Dataset''.
+    \item Proponer un marco teórico para la detección y prevención de ataques de red, basado en el análisis de anomalías en tráfico cifrado y logs de red en el conjunto de datos ``NSL-KDD-Dataset''.
+\end{itemize}
+
+\begin{thebibliography}{99}
+
+\bibitem{alhawawreh2024explainable}
+Al-Hawawreh, M., \& Moustafa, N. (2024). 
+\textit{Explainable deep learning for attack intelligence and combating cyber--physical attacks}. 
+Ad Hoc Networks, 154, 103329. 
+\url{https://doi.org/10.1016/j.adhoc.2023.103329}
+
+\bibitem{gaber2024malware}
+Gaber, M. G., \& M. A. (2024). 
+\textit{Malware Detection with Artificial Intelligence: A Systematic Literature Review}. 
+ACM Computing Surveys, 56(6), 1--33. 
+\url{https://doi.org/10.1145/3638552}
+
+\bibitem{naeem2024classification}
+Naeem, H., Ullah, F., \& Srivastava, G. (2024). 
+\textit{Classification of intrusion cyber-attacks in smart power grids using deep ensemble learning with metaheuristic-based optimization}. 
+Expert Systems, 41(5), e13556. 
+\url{https://doi.org/10.1111/exsy.13556}
+
+\bibitem{sharma2024explainable}
+Sharma, B., Sharma, L., Lal, C., \& Roy, S. (2024). 
+\textit{Explainable artificial intelligence for intrusion detection in IoT networks: A deep learning based approach}. 
+Expert Systems with Applications, 238, 121751. 
+\url{https://doi.org/10.1016/j.eswa.2023.121751}
+
+\bibitem{ullah2024ids}
+Ullah, F., Ullah, S., Srivastava, G., \& Lin, J. C. W. (2024). 
+\textit{IDS-INT: Intrusion detection system using transformer-based transfer learning for imbalanced network traffic}. 
+Digital Communications and Networks, 10(1), 190--204.
+
+\bibitem{wong2016nsl}
+Wong, J. (2016). 
+\textit{NSL-KDD-Dataset}. 
+Recuperado de \url{https://github.com/jmnwong/NSL-KDD-Dataset/tree/master}
+
+\end{thebibliography}
+
+\end{document}

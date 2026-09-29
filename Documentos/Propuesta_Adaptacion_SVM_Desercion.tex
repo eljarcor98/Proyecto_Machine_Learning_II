@@ -1,0 +1,139 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{csquotes}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\onehalfspacing
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!80!black,
+    citecolor=blue!80!black,
+    urlcolor=blue!80!black,
+    pdftitle={Propuesta de Adaptación de Máquinas de Soporte Vectorial para la Predicción Temprana de Deserción Estudiantil Universitaria},
+    pdfauthor={Sara López Chavarro, Nicolás Figueroa Salgado, Arnold Santiago Torres Anzola}
+}
+
+\title{\textbf{\Large Propuesta de Adaptación de Máquinas de Soporte Vectorial para la Predicción Temprana de Deserción Estudiantil Universitaria bajo Diferentes Métodos de Normalización} \\
+\vspace{0.3cm}
+\large Machine Learning II}
+
+\author{
+    \textbf{Sara López Chavarro} \\
+    \textbf{Nicolás Figueroa Salgado} \\
+    \textbf{Arnold Santiago Torres Anzola} \\[0.4cm]
+    \small Universidad Externado de Colombia \\
+    \small Departamento de Matemáticas \\
+    \small Programa de Ciencia de Datos \\
+    \small Bogotá, 2026
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\vspace{0.3cm}
+
+\section{El problema planteado en el artículo}
+
+El artículo base seleccionado, titulado \textit{``Support Vector Machine for Predicting Student Dropout Under Different Normalization Methods''} (Boteju et al., 2024), aborda la problemática de la deserción y el retraso en la graduación en la educación superior. Este fenómeno genera costos económicos y psicológicos significativos tanto para los estudiantes (endeudamiento y pérdida de tiempo) como para las instituciones (pérdida de eficiencia y recursos). La detección temprana de estudiantes en riesgo es un desafío complejo debido a la influencia multifactorial de variables socioeconómicas, demográficas y académicas.
+
+\section{El método usado en el artículo}
+
+El estudio implementa Máquinas de Soporte Vectorial (SVM) para clasificar el estado final del estudiante. Su núcleo metodológico radica en evaluar el impacto de 9 técnicas diferentes de preprocesamiento y normalización de datos (como \texttt{StandardScaler}, \texttt{MinMaxScaler}, \texttt{OneHotEncoder}, \texttt{QuantileTransformer}, entre otros) sobre la capacidad predictiva del modelo. Configuran una SVM con un núcleo polinómico de grado 3 y validan los resultados mediante ejecuciones iterativas de 50 ensayos para garantizar estabilidad estadística.
+
+\subsection{Supuestos principales del artículo}
+\begin{itemize}
+    \item \textbf{Relaciones no lineales:} Los datos presentan relaciones complejas que pueden ser separadas en espacios de alta dimensión mediante el uso de funciones de kernel (truco del kernel).
+    \item \textbf{Sensibilidad al escalado:} La escala y la transformación de las características de entrada alteran de forma directa la posición de los hiperplanos de separación y los vectores de soporte, afectando la generalización del modelo.
+    \item \textbf{Multifactorialidad:} Las variables socioeconómicas, demográficas y académicas capturan las señales latentes de riesgo de abandono escolar.
+\end{itemize}
+
+\subsection{Resultados reportados y limitaciones}
+\begin{itemize}
+    \item \textbf{Resultados:} Se demostró que el preprocesamiento es crítico; el uso de \texttt{OneHotEncoder} obtuvo el mejor desempeño promedio con un puntaje $F_1$ de $0.778$, superando ampliamente a los modelos sin normalización (que promediaban $0.50$).
+    \item \textbf{Limitaciones:} El estudio se limita a un dataset específico de la UC Irvine de 4,424 registros y explora un conjunto cerrado de transformaciones, dejando abierta la discusión sobre cómo se comportan estas técnicas frente a clases altamente desbalanceadas en contextos institucionales específicos de América Latina.
+\end{itemize}
+
+\section{Planteamiento del Problema en un Contexto Local}
+
+\subsection{Pregunta de investigación}
+¿Es posible predecir de manera temprana el riesgo de deserción académica en estudiantes universitarios de pregrado en Colombia mediante un flujo robusto de Machine Learning basado en SVM, optimizando el rendimiento predictivo a través de técnicas avanzadas de normalización de datos?
+
+\subsection{Tipo de tarea}
+Problema de clasificación multiclase (con proyección a binarización crítica para identificar la clase de interés: ``Desertor'' vs. ``No Desertor'').
+
+\subsection{Variable objetivo}
+La variable objetivo es el estado académico final del estudiante al término de su cohorte o periodo de seguimiento, categorizada en tres clases discretas:
+\begin{itemize}
+    \item \textbf{Graduado:} Estudiante que culmina su plan de estudios exitosamente.
+    \item \textbf{En curso:} Estudiante activo que continúa su proceso formativo.
+    \item \textbf{Desertor:} Estudiante que abandona formal o informalmente el programa.
+\end{itemize}
+
+Para mayor precisión analítica, se adoptan las definiciones institucionales de abandono:
+\begin{description}[style=multiline, leftmargin=3.5cm]
+    \item[Abandono formal:] Ocurre cuando el estudiante realiza un trámite administrativo e institucional de retiro oficial. Esto incluye la cancelación explícita de la matrícula, la solicitud de retiro definitivo del programa o la anulación de su cupo ante la oficina de admisiones o secretaría académica de la universidad. En este caso, la institución tiene constancia administrativa inmediata de su salida.
+    \item[Abandono informal (Deserción silenciosa):] Ocurre cuando el estudiante simplemente deja de asistir a clases, abandona las actividades académicas, deja de presentar evaluaciones y no renueva su matrícula para el periodo siguiente, sin notificar oficialmente a la universidad ni realizar ningún trámite de retiro. Este tipo de abandono suele detectarse de manera tardía por parte de la institución a través de la inasistencia prolongada o la inactividad en los sistemas de gestión de aprendizaje.
+\end{description}
+
+En el contexto colombiano, la deserción en educación superior afecta la movilidad social y la eficiencia del sistema educativo. Contar con un modelo predictivo integrado en las instituciones permite a las directivas y a los centros de bienestar universitario activar rutas de intervención temprana (como tutorías, apoyo financiero o asesoría psicológica) antes de que el estudiante abandone definitivamente sus estudios.
+
+Se reproducirá y adaptará la metodología central del artículo de Boteju et al. (2024), consistente en la aplicación sistemática de SVM evaluando múltiples esquemas de normalización. Sin embargo, se adaptará incorporando un flujo riguroso propio de Machine Learning II: validación cruzada anidada, análisis detallado de curvas de decisión y métricas ajustadas al desbalance de clases típico del fenómeno de deserción en el sistema universitario nacional.
+
+\section{Estrategia de Datos (Fundamentación SPADIES 3.0)}
+
+Para cumplir con el requerimiento metodológico de contar con un volumen robusto (mínimo 5,000 registros) y garantizar la reproducibilidad, se adoptará la vía de \textbf{Simulación Fundamentada}, adoptando el marco conceptual y metodológico del Sistema para la Prevención y Análisis de la Deserción en las Instituciones de Educación Superior (SPADIES 3.0) del Ministerio de Educación Nacional de Colombia.
+
+\subsection{Justificación y estructura de la simulación}
+La estructura generadora replicará el enfoque de ``historia de vida'' promovido por el SPADIES 3.0, simulando transiciones semestre a semestre bajo distribuciones y dependencias empíricas observadas en el sistema educativo nacional.
+
+Para garantizar un realismo estricto, la generación de los datos se basará en las variables de caracterización oficiales extraídas del módulo de consulta básica del SPADIES 3.0:
+\begin{enumerate}
+    \item \textbf{Edad al presentar el ICFES:} Variable demográfica que modela la edad de ingreso del estudiante al sistema de educación superior.
+    \item \textbf{Ingresos de la familia:} Estratificación o rangos de ingresos del núcleo familiar orientados a capturar la vulnerabilidad socioeconómica.
+    \item \textbf{Apoyos y tipo de crédito del ICETEX:} Indicadores y categorías que determinan si el estudiante cuenta con financiación externa (crédito de corto o largo plazo, o subsidios).
+    \item \textbf{Situación laboral (si trabajaba al presentar el ICFES):} Condición de ocupación laboral previa o simultánea al ingreso a la educación superior.
+    \item \textbf{Clasificación en el ICFES (Saber 11):} Nivel de desempeño y puntajes obtenidos en la prueba de Estado, reflejando las competencias académicas de base.
+    \item \textbf{Apoyos institucionales de la universidad:} Variable que registra si el estudiante ha sido beneficiario de auxilios, monitorías o apoyos socioeconómicos otorgados directamente por la IES.
+    \item \textbf{Rendimiento académico y dependencias causales:} Promedio ponderado acumulado (PPA) en los primeros semestres y número de créditos reprobados, modelados con distribuciones beta y gamma truncadas. Se introducirán correlaciones lógicas fundamentadas en la dinámica del SPADIES 3.0 (por ejemplo, menor puntaje de clasificación ICFES, baja familia de ingresos y alta carga laboral previa aumentan la probabilidad de caída en el PPA, incrementando exponencialmente la probabilidad de transición a la clase Desertor bajo el criterio de inasistencia por dos o más periodos consecutivos).
+\end{enumerate}
+
+\subsection{Caracterización del dataset previsto}
+\begin{itemize}
+    \item \textbf{Volumen:} 6,000 registros de estudiantes simulados.
+    \item \textbf{Predictores:} 36 atributos estructurados en dimensiones demográficas, socioeconómicas, de desempeño académico temprano y de ayudas financieras (ICETEX e institucionales).
+    \item \textbf{Variable objetivo:} Estado de terminación del ciclo académico (\texttt{Graduado}, \texttt{Enrolado}, \texttt{Desertor}).
+\end{itemize}
+
+\section{Plan de Modelamiento y Línea Base}
+
+\subsection{Modelos avanzados candidatos}
+Dado el enfoque del curso y del artículo, se implementarán y compararán los siguientes modelos utilizando la librería \texttt{scikit-learn} siguiendo los lineamientos dados también dentro del artículo guía:
+\begin{itemize}
+    \item \textbf{SVM con Kernel Polinómico y Lineal:} Reproduciendo el enfoque del artículo base bajo diferentes transformaciones de escalado (\texttt{StandardScaler}, \texttt{MinMaxScaler}, \texttt{OneHotEncoder}, \texttt{QuantileTransformer}).
+    \item \textbf{Modelos de Ensambles basados en Árboles (Random Forest, Gradient Boosting, XGBoost):} Utilizados como modelos avanzados de comparación para evaluar si superan la capacidad de separación hiperplana de las SVM en este espacio de características.
+\end{itemize}
+
+\subsection{Métrica de evaluación}
+La métrica principal seleccionada será el \textbf{$F_1$-Score Ponderado} (\textit{Weighted $F_1$-Score}) y el \textbf{$F_1$-Score por clase} (enfocado en la clase minoritaria ``Desertor''). Se justifica esta elección debido a que la deserción suele representar una proporción menor en los datos en comparación con los estudiantes que continúan o se gradúan; optimizar únicamente el \textit{Accuracy} (exactitud) generaría una ilusión de buen rendimiento ignorando los falsos negativos (estudiantes en riesgo no detectados).
+
+\subsection{Estrategia de validación}
+Se implementará un esquema de \textbf{Validación Cruzada Anidada} (\textit{Nested Cross-Validation}) o partición estricta de entrenamiento, validación y prueba ($70\%$, $15\%$, $15\%$). El preprocesamiento (escalado, imputación y codificación) se encapsulará dentro de objetos \texttt{Pipeline} de Scikit-Learn, ajustando los transformadores únicamente con los pliegues de entrenamiento de cada iteración para garantizar la ausencia total de fuga de datos (\textit{data leakage}).
+
+\subsection{Línea base (Baseline)}
+Como referencia mínima de comparación se construirá un modelo de línea base sencillo (un clasificador de regla de mayoría o una Regresión Logística básica con preprocesamiento estándar sin optimización de hiperparámetros). Cualquier modelo avanzado seleccionado deberá superar de manera estadísticamente significativa el desempeño de esta línea base.
+
+\end{document}

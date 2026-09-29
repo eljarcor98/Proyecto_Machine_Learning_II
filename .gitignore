@@ -17,3 +17,15 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# LaTeX build artifacts
+*.aux
+*.out
+*.log
+*.fls
+*.fdb_latexmk
+*.toc
+*.synctex.gz
+*.bbl
+*.blg
+
