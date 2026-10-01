@@ -1,0 +1,9 @@
+variable,grupo,n_desertores,recall
+sexo,Hombre,33,0.45454545454545453
+sexo,Mujer,44,0.4090909090909091
+zona_residencia,Rural,18,0.5
+zona_residencia,Urbana,59,0.4067796610169492
+sector_ies,Privado,42,0.5476190476190477
+sector_ies,Publico,35,0.2857142857142857
+metodologia,Distancia tradicional,14,0.35714285714285715
+metodologia,Presencial,57,0.42105263157894735

@@ -1,0 +1,327 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{csquotes}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{float}
+\usepackage{xltabular}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\onehalfspacing
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!80!black,
+    citecolor=blue!80!black,
+    urlcolor=blue!80!black,
+    pdftitle={Máquinas de Soporte Vectorial para la Predicción Temprana de Deserción Estudiantil Universitaria},
+    pdfauthor={Sara López Chavarro, Nicolás Figueroa Salgado, Arnold Santiago Torres Anzola}
+}
+
+\title{\textbf{\Large Máquinas de Soporte Vectorial para la Predicción Temprana de Deserción Estudiantil Universitaria bajo Diferentes Métodos de Normalización} \\
+\vspace{0.3cm}
+\large Machine Learning II}
+
+\author{
+    \textbf{Sara López Chavarro} \\
+    \textbf{Nicolás Figueroa Salgado} \\
+    \textbf{Arnold Santiago Torres Anzola} \\[0.4cm]
+    \small Universidad Externado de Colombia \\
+    \small Departamento de Matemáticas \\
+    \small Programa de Ciencia de Datos \\
+    \small Bogotá, 2026
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\vspace{0.3cm}
+
+\section{El problema planteado en el artículo}
+
+El artículo base seleccionado, titulado \textit{``Support Vector Machine for Predicting Student Dropout Under Different Normalization Methods''} \cite{boteju2024}, aborda la problemática de la deserción y el retraso en la graduación en la educación superior. Este fenómeno genera costos económicos y psicológicos significativos tanto para los estudiantes (endeudamiento y pérdida de tiempo) como para las instituciones (pérdida de eficiencia y recursos). La detección temprana de estudiantes en riesgo es un desafío complejo debido a la influencia multifactorial de variables socioeconómicas, demográficas y académicas \cite[pág.~8633]{boteju2024}.
+
+\section{El método usado en el artículo}
+
+El estudio implementa Máquinas de Soporte Vectorial (SVM) para clasificar el estado final del estudiante. Su núcleo metodológico radica en evaluar el impacto de 9 técnicas diferentes de preprocesamiento y normalización de datos (como \texttt{StandardScaler}, \texttt{MinMaxScaler}, \texttt{OneHotEncoder}, \texttt{QuantileTransformer}, entre otros) sobre la capacidad predictiva del modelo \cite[pág.~8633]{boteju2024}. Configuran una SVM con un núcleo polinómico de grado 3 y validan los resultados mediante ejecuciones iterativas de 50 ensayos para garantizar estabilidad estadística \cite[pág.~8635]{boteju2024}.
+
+\subsection{Supuestos principales del artículo}
+\begin{itemize}
+    \item \textbf{Relaciones no lineales:} Los datos presentan relaciones complejas que pueden ser separadas en espacios de alta dimensión mediante el uso de funciones de kernel (truco del kernel).
+    \item \textbf{Sensibilidad al escalado:} La escala y la transformación de las características de entrada alteran de forma directa la posición de los hiperplanos de separación y los vectores de soporte, afectando la generalización del modelo.
+    \item \textbf{Multifactorialidad:} Las variables socioeconómicas, demográficas y académicas capturan las señales latentes de riesgo de abandono escolar.
+\end{itemize}
+
+\subsection{Resultados reportados y limitaciones}
+\begin{itemize}
+    \item \textbf{Resultados:} Se demostró que el preprocesamiento es crítico; el uso de \texttt{OneHotEncoder} obtuvo el mejor desempeño promedio con un puntaje $F_1$ de $0.778$, superando ampliamente a los modelos sin normalización (que promediaban $0.50$).
+    \item \textbf{Limitaciones:} El estudio se limita a un dataset específico de la UC Irvine de 4,424 registros y explora un conjunto cerrado de transformaciones, dejando abierta la discusión sobre cómo se comportan estas técnicas frente a clases altamente desbalanceadas en contextos institucionales específicos de América Latina.
+\end{itemize}
+
+\section{Planteamiento del Problema en un Contexto Local}
+
+\subsection{Pregunta de investigación}
+¿Es posible predecir de manera temprana el riesgo de deserción académica en estudiantes universitarios de pregrado en Colombia mediante un flujo robusto de Machine Learning basado en SVM, optimizando el rendimiento predictivo a través de técnicas avanzadas de normalización de datos?
+
+\subsection{Tipo de tarea}
+Problema de clasificación multiclase (con proyección a binarización crítica para identificar la clase de interés: ``Desertor'' vs. ``No Desertor'').
+
+\subsection{Variable objetivo}
+La variable objetivo es el estado académico final del estudiante al término de su cohorte o periodo de seguimiento, categorizada en tres clases discretas:
+\begin{itemize}
+    \item \textbf{Graduado:} Estudiante que culmina su plan de estudios exitosamente.
+    \item \textbf{En curso:} Estudiante activo que continúa su proceso formativo.
+    \item \textbf{Desertor:} Estudiante que abandona formal o informalmente el programa.
+\end{itemize}
+
+Para mayor precisión analítica, se adoptan las definiciones institucionales de abandono:
+\begin{description}[style=multiline, leftmargin=3.5cm]
+    \item[Abandono formal:] Ocurre cuando el estudiante realiza un trámite administrativo e institucional de retiro oficial. Esto incluye la cancelación explícita de la matrícula, la solicitud de retiro definitivo del programa o la anulación de su cupo ante la oficina de admisiones o secretaría académica de la universidad. En este caso, la institución tiene constancia administrativa inmediata de su salida.
+    \item[Abandono informal (Deserción silenciosa):] Ocurre cuando el estudiante simplemente deja de asistir a clases, abandona las actividades académicas, deja de presentar evaluaciones y no renueva su matrícula para el periodo siguiente, sin notificar oficialmente a la universidad ni realizar ningún trámite de retiro. Este tipo de abandono suele detectarse de manera tardía por parte de la institución a través de la inasistencia prolongada o la inactividad en los sistemas de gestión de aprendizaje.
+\end{description}
+
+En el contexto colombiano, la deserción en educación superior afecta la movilidad social y la eficiencia del sistema educativo. Contar con un modelo predictivo integrado en las instituciones permite a las directivas y a los centros de bienestar universitario activar rutas de intervención temprana (como tutorías, apoyo financiero o asesoría psicológica) antes de que el estudiante abandone definitivamente sus estudios.
+
+Se reproducirá y adaptará la metodología central del artículo de Boteju et al. \cite{boteju2024}, consistente en la aplicación sistemática de SVM evaluando múltiples esquemas de normalización a través de ejecuciones iterativas de 50 ensayos para garantizar estabilidad estadística, análisis de curvas de decisión y métricas ajustadas al desbalance de clases típico del fenómeno de deserción en el sistema universitario nacional.
+
+\section{Estrategia de Datos (Fundamentación SPADIES 3.0)}
+
+Para cumplir con el requerimiento metodológico de contar con un volumen robusto (mínimo 5,000 registros) y garantizar la reproducibilidad, se adoptará la vía de \textbf{Simulación Fundamentada}, adoptando el marco conceptual y metodológico del Sistema para la Prevención y Análisis de la Deserción en las Instituciones de Educación Superior (SPADIES 3.0) del Ministerio de Educación Nacional de Colombia \cite{mineducacion2024} y los desarrollos de Sistemas de Alerta Temprana en el país \cite{penapico2024}.
+
+\subsection{Justificación y estructura de la simulación}
+La estructura generadora replicará el enfoque de ``historia de vida'' promovido por el SPADIES 3.0 \cite{mineducacion2024} y la arquitectura del Sistema de Alerta Temprana de Deserción Estudiantil (SAT-DE) desarrollada por Peña Pico et al. \cite{penapico2024}, simulando transiciones semestre a semestre bajo distribuciones y dependencias empíricas observadas en el sistema educativo nacional.
+
+Para garantizar un realismo estricto, la generación de los datos se basará en las variables de caracterización oficiales extraídas del módulo de consulta básica del SPADIES 3.0 y del marco de simulación del SAT-DE \cite{penapico2024}:
+\begin{enumerate}
+    \item \textbf{Edad al presentar el ICFES:} Variable demográfica que modela la edad de ingreso del estudiante al sistema de educación superior.
+    \item \textbf{Apoyos y tipo de crédito del ICETEX:} Indicadores y categorías que determinan si el estudiante cuenta con financiación externa (crédito de corto o largo plazo, o subsidios).
+    \item \textbf{Situación laboral (si trabajaba al presentar el ICFES):} Condición de ocupación laboral previa o simultánea al ingreso a la educación superior.
+    \item \textbf{Clasificación en el ICFES (Saber 11):} Nivel de desempeño y puntajes obtenidos en la prueba de Estado, reflejando las competencias académicas de base.
+    \item \textbf{Rendimiento académico y dependencias causales:} Promedio ponderado acumulado (PPA) en los primeros semestres y número de créditos reprobados, modelados con distribuciones beta y gamma truncadas. Se introducirán correlaciones lógicas fundamentadas en la dinámica del SPADIES 3.0 \cite{mineducacion2024} y del SAT-DE \cite{penapico2024} (por ejemplo, menor puntaje de clasificación ICFES, baja familia de ingresos y alta carga laboral previa aumentan la probabilidad de caída en el PPA, incrementando exponencialmente la probabilidad de transición a la clase Desertor bajo el criterio de inasistencia por dos o más periodos consecutivos).
+\end{enumerate}
+
+\subsection{Caracterización del dataset previsto}
+\begin{itemize}
+    \item \textbf{Volumen:} 11,500 registros de estudiantes simulados.
+    \item \textbf{Predictores:} 21 atributos estructurados (22 variables en total, incluyendo la variable objetivo) en dimensiones demográficas, socioeconómicas, de desempeño académico temprano y de ayudas financieras (ICETEX e institucionales).
+    \item \textbf{Variable objetivo:} Estado de terminación del ciclo académico (\texttt{Graduado}, \texttt{En curso}, \texttt{Desertor}).
+\end{itemize}
+
+\section{Plan de Modelamiento y Línea Base}
+
+\subsection{Modelos avanzados candidatos}
+Dado el enfoque del curso y del artículo, se implementarán y evaluarán las Máquinas de Soporte Vectorial (SVM) utilizando la librería \texttt{scikit-learn}, siguiendo los lineamientos metodológicos del artículo guía:
+\begin{itemize}
+    \item \textbf{SVM con Kernel Polinómico y RBF:} Reproduciendo el enfoque del artículo base bajo diferentes transformaciones de escalado (\texttt{StandardScaler}, \texttt{PowerTransformer}, \texttt{RobustScaler}, \texttt{MinMaxScaler}, \texttt{QuantileTransformer}, entre otros).
+\end{itemize}
+
+\subsection{Métrica de evaluación}
+La métrica principal seleccionada será el \textbf{$F_1$-Score Ponderado} (\textit{Weighted $F_1$-Score}) y el \textbf{$F_1$-Score por clase} (enfocado en la clase minoritaria ``Desertor''). Se justifica esta elección debido a que la deserción suele representar una proporción menor en los datos en comparación con los estudiantes que continúan o se gradúan; optimizar únicamente el \textit{Accuracy} (exactitud) generaría una ilusión de buen rendimiento ignorando los falsos negativos (estudiantes en riesgo no detectados).
+
+\subsection{Línea base (Baseline)}
+Como referencia mínima de comparación se construirá un modelo de línea base sencillo (un clasificador de regla de mayoría o una Regresión Logística básica con preprocesamiento estándar sin optimización de hiperparámetros). Cualquier modelo avanzado seleccionado deberá superar de manera estadísticamente significativa el desempeño de esta línea base.
+
+\section{Estructura del Dataset y Variables Predictoras}
+
+El dataset consta de \textbf{11,500 observaciones de estudiantes} y \textbf{21 características predictoras} (11 continuas/discretas y 10 categóricas nominales/ordinales). Las Tablas \ref{tab:variables_num} y \ref{tab:variables_cat} resumen la definición técnica de cada atributo.
+
+\begin{table}[htbp]
+\centering
+\caption{Variables numéricas continuas y discretas del dataset ($n=11,500$)}
+\label{tab:variables_num}
+\small
+\begin{tabularx}{\textwidth}{l l l X}
+\toprule
+\textbf{Variable} & \textbf{Tipo} & \textbf{Rango / Unidad} & \textbf{Descripción Conceptual} \\
+\midrule
+\texttt{edad\_ingreso} & Entero & 15 - 35 años & Edad del estudiante al momento de matricularse. \\
+\texttt{promedio\_academico} & Continuo & 0.00 - 5.00 & Promedio acumulado de notas en la escala nacional. \\
+\texttt{materias\_reprobadas} & Entero & 0 - 8 asignaturas & Número acumulado de asignaturas perdidas. \\
+\texttt{distancia\_hogar\_ies\_km} & Continuo & 0.5 - 150.0 km & Distancia geográfica entre la vivienda y el campus. \\
+\texttt{puntaje\_icfes\_percentil} & Continuo & 1 - 100 percentil & Desempeño relativo en las pruebas Saber 11. \\
+\texttt{semestre\_cursado} & Entero & 1 - 14 semestres & Nivel de avance en el plan de estudios. \\
+\texttt{estrato\_socioeconomico} & Discreto & 1 - 6 estrato & Clasificación socioeconómica del hogar. \\
+\texttt{anio\_registro} & Entero & 2020 - 2026 & Año de cohorte de ingreso a la institución. \\
+\texttt{trabaja\_mientras\_estudia} & Binario & 0 o 1 & Indicador de actividad laboral simultánea. \\
+\texttt{beneficiario\_icetex} & Binario & 0 o 1 & Subsidio o crédito educativo estatal. \\
+\texttt{beneficiario\_beca} & Binario & 0 o 1 & Beca institucional o auxilio de matrícula. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Variables categóricas nominales y ordinales del dataset}
+\label{tab:variables_cat}
+\small
+\begin{tabularx}{\textwidth}{l p{4.8cm} X}
+\toprule
+\textbf{Variable} & \textbf{Categorías} & \textbf{Descripción} \\
+\midrule
+\texttt{sexo} & Masculino, Femenino & Identidad de género del estudiante. \\
+\texttt{estado\_civil} & Soltero, Casado, Unión libre & Estado civil al ingreso. \\
+\texttt{zona\_residencia} & Urbana, Rural & Entorno geográfico del hogar. \\
+\texttt{departamento} & Cundinamarca, Antioquia, Valle, etc. & Departamento de procedencia. \\
+\texttt{nivel\_educativo\_padre} & Primaria, Secundaria, Pregrado, Posgrado & Máximo nivel educativo del padre. \\
+\texttt{nivel\_educativo\_madre} & Primaria, Secundaria, Pregrado, Posgrado & Máximo nivel educativo de la madre. \\
+\texttt{sector\_ies} & Oficial (Público), Privado & Carácter jurídico de la IES. \\
+\texttt{nivel\_formacion} & Técnico profesional, Tecnológico, Universitario & Nivel académico del programa. \\
+\texttt{metodologia} & Presencial, Virtual, Distancia & Modalidad de impartición de clases. \\
+\texttt{area\_conocimiento} & Ingenierías, Salud, Sociales, Administración & Núcleo básico de conocimiento. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Análisis Exploratorio de Datos (EDA) y Diagnóstico de Outliers}
+
+\subsection{Diagnóstico Estadístico de Variables Continuas (IQR y Asimetría)}
+Se aplicó un análisis estricto mediante el Rango Intercuartílico ($\text{IQR} = Q_3 - Q_1$) y la medida de asimetría de Fisher ($\text{Skewness}$) para identificar la presencia de valores atípicos extremados en las variables cuantitativas (Tabla \ref{tab:iqr_diag}).
+
+\begin{table}[htbp]
+\centering
+\caption{Diagnóstico estadístico de outliers y asimetría en variables continuas}
+\label{tab:iqr_diag}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Variable} & \textbf{Media} & \textbf{Mediana} & \textbf{IQR} & \textbf{Conteo Outliers} & \textbf{\% Outliers} & \textbf{Skewness} \\
+\midrule
+\texttt{edad\_ingreso} & 19.57 & 19.00 & 5.00 & 3 & 0.03\% & +0.32 \\
+\texttt{promedio\_academico} & 3.41 & 3.41 & 0.86 & 43 & 0.37\% & -0.05 \\
+\texttt{materias\_reprobadas} & 1.09 & 1.00 & 2.00 & 39 & 0.34\% & +1.24 \\
+\texttt{distancia\_hogar\_ies\_km} & 11.12 & 7.43 & 9.53 & 824 & \textbf{7.17\%} & \textbf{+5.05} \\
+\texttt{puntaje\_icfes\_percentil} & 57.96 & 58.00 & 24.00 & 36 & 0.31\% & -0.03 \\
+\texttt{semestre\_cursado} & 6.53 & 7.00 & 5.00 & 0 & 0.00\% & -0.02 \\
+\texttt{estrato\_socioeconomico} & 2.61 & 2.00 & 1.00 & 959 & \textbf{8.34\%} & +0.67 \\
+\texttt{beneficiario\_icetex} & 0.22 & 0.00 & 0.00 & 2516 & \textbf{21.88\%} & +1.36 \\
+\texttt{beneficiario\_beca} & 0.19 & 0.00 & 0.00 & 2147 & \textbf{18.67\%} & +1.61 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\textbf{Hallazgo Crítico del EDA}: La variable \texttt{distancia\_hogar\_ies\_km} exhibe un sesgo positivo severo ($\text{Skewness} = +5.05$) con un $7.17\%$ de observaciones extremas (estudiantes procedentes de zonas alejadas o rurales). Esto demuestra empíricamente la necesidad de utilizar escaladores inmunes a valores extremos como \texttt{RobustScaler} y \texttt{PowerTransformer}.
+
+\section{Técnicas de Normalización Evaluadas}
+
+Para estudiar el impacto de la escala en la geometría de separación del hiperplano de soporte vectorial, se implementaron 8 esquemas de transformación cuantitativa, cuyas formulaciones matemáticas y propiedades técnicas se resumen en la Tabla \ref{tab:tecnicas_normalizacion}.
+
+\small
+\begin{xltabular}{\textwidth}{l c X}
+\caption{Resumen de las técnicas de normalización y escalamiento evaluadas} \label{tab:tecnicas_normalizacion} \\
+\toprule
+\textbf{Método / Escalador} & \textbf{Fórmula / Definición} & \textbf{Propiedades Técnicas y Robustez} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Método / Escalador} & \textbf{Fórmula / Definición} & \textbf{Propiedades Técnicas y Robustez} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\texttt{StandardScaler} & $z = \frac{x - \mu}{\sigma}$ & Centra en la media ($\mu=0$) y escala a varianza unitaria ($\sigma=1$). Sensible a atípicos. \\[0.15cm]
+\texttt{PowerTransformer} & $g_\lambda(x)$ & Transformación de Yeo-Johnson; estabiliza la varianza y aproxima a distribución gaussiana. \\[0.15cm]
+\texttt{RobustScaler} & $x_{\text{robust}} = \frac{x - \text{Mediana}(x)}{\text{IQR}(x)}$ & Escala mediante mediana e Rango Intercuartílico (IQR). Inmune a valores extremos. \\[0.15cm]
+\texttt{MinMaxScaler} & $x_{\text{minmax}} = \frac{x - x_{\min}}{x_{\max} - x_{\min}}$ & Acota los valores al intervalo estricto $[0, 1]$. Preserva relaciones pero sensible a outliers. \\[0.15cm]
+\texttt{QuantileTransformer} & $x' = G^{-1}(F_{\text{emp}}(x))$ & Mapeo no paramétrico a distribución uniforme basado en cuantiles empíricos. \\[0.15cm]
+\texttt{MaxAbsScaler} & $x_{\text{maxabs}} = \frac{x}{|x_{\max}|}$ & Escala en el rango $[-1, 1]$ dividiendo por el máximo absoluto. Preserva dispersión. \\[0.15cm]
+\texttt{OrdinalEncoder} & $x \to \{0, 1, 2, \dots, k-1\}$ & Mapeo entero discreto básico para variables cualitativas u ordinales. \\[0.15cm]
+\texttt{No Normalization} & $x_{\text{raw}} = x$ & Evaluación sobre la escala cruda original sin transformar (modelo baseline). \\
+\end{xltabular}
+\normalsize
+
+\section{Resultados Empíricos: Impacto de la Normalización en SVM}
+
+Tras ejecutar \textbf{50 ensayos independientes ($N=50$ trials / 400 modelos entrenados)} con validación estratificada $80/20$ sin fuga de datos, se obtuvieron los resultados tabulados en la Tabla \ref{tab:resultados_50trials}.
+
+\begin{table}[htbp]
+\centering
+\caption{Resultados consolidados de 50 trials independientes sobre SVM Multiclase}
+\label{tab:resultados_50trials}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Método de Normalización} & \textbf{Weighted F1} & \textbf{Macro F1} & \textbf{Desertor F1} & \textbf{Std ($\sigma$)} & \textbf{T-Stat} & \textbf{p-value vs Baseline} \\
+\midrule
+\textbf{Standard Scaler} & \textbf{0.8878} & \textbf{0.8872} & \textbf{0.9015} & 0.0061 & +323.539 & $< 0.000001$ \\
+\textbf{Power Transformer} & \textbf{0.8877} & \textbf{0.8870} & \textbf{0.9016} & 0.0058 & +330.439 & $< 0.000001$ \\
+\textbf{Robust Scaler} & \textbf{0.8765} & \textbf{0.8759} & \textbf{0.8846} & 0.0060 & +317.745 & $< 0.000001$ \\
+\textbf{Min Max Scaler} & 0.8443 & 0.8431 & 0.8352 & 0.0052 & +311.297 & $< 0.000001$ \\
+\textbf{Quantile Transformer} & 0.8422 & 0.8429 & 0.8361 & 0.0060 & +289.204 & $< 0.000001$ \\
+\textbf{Max Absolute Scaler} & 0.8414 & 0.8398 & 0.8314 & 0.0054 & +303.870 & $< 0.000001$ \\
+\texttt{No Normalization} (Baseline) & 0.4792 & 0.4097 & 0.6258 & 0.0064 & 0.000 & 1.000000 \\
+\texttt{Ordinal Encoder} & 0.3699 & 0.3512 & 0.0000 & 0.0052 & -93.259 & $< 0.000001$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Análisis del Impacto de la Normalización}
+\begin{enumerate}
+    \item \textbf{Colapso del Modelo Baseline sin Normalizar}: El modelo SVM sin escalar obtiene un Macro $F_1$ de apenas \textbf{0.4097}. Debido a que SVM calcula distancias euclidianas para encontrar el margen óptimo, variables con rangos amplios (como \texttt{puntaje\_icfes\_percentil} entre 1 y 100) dominan artificialmente la función de costo frente a variables clave en escala pequeña (como \texttt{promedio\_academico} entre 0 y 5).
+    \item \textbf{Mejora Absoluta con \texttt{StandardScaler} y \texttt{PowerTransformer}}: Ambos métodos incrementaron el Macro $F_1$ en \textbf{+0.4775 puntos (+116.5\%)} frente al baseline, demostrando ser las transformaciones óptimas para la geometría del kernel RBF.
+    \item \textbf{Significancia Estadística}: La prueba $t$ de Welch confirma un $p$-value $< 10^{-6}$ ($t > 320.0$), ratificando que la diferencia de rendimiento es sistemática y estadísticamente significativa.
+\end{enumerate}
+
+\section{Definición e Interpretación de las Métricas de Evaluación}
+
+Para garantizar la rigurosidad en la evaluación de la deserción universitaria, se definen e interpretan formalmente las métricas utilizadas:
+
+\begin{enumerate}
+    \item \textbf{Macro $F_1$-Score (Métrica Clave de Decisión):} Es la media aritmética no ponderada del $F_1$-Score calculado independientemente para cada una de las 3 clases ($K=3$):
+    \begin{equation}
+    \text{Macro } F_1 = \frac{1}{K} \sum_{k=1}^{K} F1_k = \frac{F1_{\text{Desertor}} + F1_{\text{En curso}} + F1_{\text{Graduado}}}{3}
+    \end{equation}
+    \textit{Importancia}: Trata a todas las clases por igual. Evita que un alto rendimiento en la clase mayoritaria (\texttt{En curso}) encubra fallos en la detección de la clase minoritaria crítica (\texttt{Desertor}).
+
+    \item \textbf{Weighted $F_1$-Score (Promedio Ponderado):} Promedia el $F_1$ ponderando por la proporción de estudiantes en cada clase ($w_k = N_k / N$):
+    \begin{equation}
+    \text{Weighted } F_1 = \sum_{k=1}^{K} w_k \cdot F1_k
+    \end{equation}
+
+    \item \textbf{Sensibilidad / Recall de la Clase Crítica (\texttt{Desertor}):} Mide la proporción de estudiantes en deserción real que fueron correctamente identificados por el modelo:
+    \begin{equation}
+    \text{Recall}_{\text{Desertor}} = \frac{TP_{\text{Desertor}}}{TP_{\text{Desertor}} + FN_{\text{Desertor}}}
+    \end{equation}
+    En nuestro modelo final con \texttt{StandardScaler}, el Recall alcanzó \textbf{92.11\%}, reduciendo los falsos negativos a un mínimo (evitando desatender estudiantes en riesgo).
+
+    \item \textbf{Exactitud Global (Accuracy):} Proporción total de predicciones correctas sobre el conjunto de prueba ($88.78\%$).
+\end{enumerate}
+
+\vspace{0.5cm}
+\begin{thebibliography}{99}
+
+\bibitem{boteju2024}
+Boteju, G., Tang, L., \& Scott Brown, M. (2024). 
+\textit{Support Vector Machine for Predicting Student Dropout Under Different Normalization Methods}. 
+IEEE International Conference on Big Data (BigData), pp. 8633--8638. Washington, DC, USA: IEEE. 
+\url{https://doi.org/10.1109/BigData62323.2024.10825023}
+
+\bibitem{mineducacion2024}
+Ministerio de Educación Nacional de Colombia. (2024). 
+\textit{SPADIES (Sistema para la Prevención de la Deserción en las Instituciones de Educación Superior: Cambio Metodológico SPADIES 3.0)}. 
+Recuperado de \url{https://www.mineducacion.gov.co/sistemasdeinformacion/1783/articles-415244_cambio_metodologico_spadies_3.pdf}
+
+\bibitem{penapico2024}
+Peña Pico, C., Sánchez Prieto, K., Gómez Vigoya, J., \& Porras Ortiz, E. (s.f.). 
+\textit{Sistema de Alerta Temprana de Deserción Estudiantil en la Educación Superior (SAT-DE)}. 
+Repositorio de GitHub. 
+Recuperado de \url{https://github.com/KevinSSP/MIAD---Sistema-de-Alerta-Temprana-de-Desercion-en-la-Educacion-Superior}
+
+\end{thebibliography}
+
+\end{document}

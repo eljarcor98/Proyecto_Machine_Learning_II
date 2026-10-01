@@ -1,0 +1,204 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[spanish]{babel}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{geometry}
+\usepackage{tabularx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{microtype}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\title{\textbf{Caracterización del Dataset, Formulación de la Variable Objetivo e Impacto de Métodos de Normalización en Máquinas de Vectores de Soporte (SVM)}}
+\author{\textbf{Arnold Santiago Torres} \\ Proyecto de Machine Learning II \\ Universidad 2026-II}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+El presente documento reúne de forma sistemática la caracterización técnica del conjunto de datos \texttt{estudiantes\_sinteticos\_11500.csv}, la formulación matemática de la variable objetivo binaria de deserción, las estadísticas descriptivas pre-normalización, la justificación de hiperparámetros del estimador SVM (\texttt{SVC}) y la fundamentación teórica de seis métodos de escalamiento evaluados en conformidad con la literatura científica reciente (IEEE 2024). El análisis demuestra la necesidad estricta de la normalización de características para evitar el sesgo de la norma euclidiana en el kernel RBF.
+\end{abstract}
+
+\section{Información General del Dataset}
+
+El conjunto de datos compilado para el modelo de predicción temprana de deserción presenta la siguiente estructura técnica:
+
+\begin{itemize}
+    \item \textbf{Nombre del archivo}: \texttt{estudiantes\_sinteticos\_11500.csv}
+    \item \textbf{Total de registros}: 11,500 observaciones de estudiantes.
+    \item \textbf{Total de variables}: 22 (21 características predictoras y 1 variable objetivo).
+    \item \textbf{Valores nulos / faltantes}: 0 (0.0\%).
+    \item \textbf{Distribución de la Variable Objetivo (\texttt{desercion})}:
+    \begin{itemize}
+        \item Clase 0 (No deserción / Permanencia): 7,637 estudiantes (66.41\%).
+        \item Clase 1 (Deserción estudiantil): 3,863 estudiantes (33.59\%).
+    \end{itemize}
+\end{itemize}
+
+\section{Diccionario Completo de Variables}
+
+\subsection{Variables Socio-Demográficas y Geográficas}
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l l l l X}
+\toprule
+\textbf{Variable} & \textbf{Tipo de Dato} & \textbf{Tipo Rango} & \textbf{Rango Original} & \textbf{Descripción} \\
+\midrule
+\texttt{edad\_ingreso} & Numérica (Entero) & Discreto & $[15 - 32]$ años & Edad del estudiante al ingresar. \\
+\texttt{sexo} & Categórica & Nominal & \texttt{'Hombre'}, \texttt{'Mujer'} & Género reportado por el estudiante. \\
+\texttt{estado\_civil} & Categórica & Nominal & 4 categorías & Estado civil en matrícula. \\
+\texttt{zona\_residencia} & Categórica & Nominal & \texttt{'Urbana'}, \texttt{'Rural'} & Zona de procedencia de vivienda. \\
+\texttt{departamento} & Categórica & Nominal & 27 dptos. Colombia & Departamento de origen. \\
+\texttt{distancia\_hogar\_ies\_km} & Numérica (Continuo) & Continuo & $[0.22 - 250.00]$ km & Distancia estimada a la IES. \\
+\bottomrule
+\end{tabularx}
+\caption{Variables socio-demográficas y geográficas.}
+\end{table}
+
+\subsection{Variables Académicas}
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l l l l X}
+\toprule
+\textbf{Variable} & \textbf{Tipo de Dato} & \textbf{Tipo Rango} & \textbf{Rango Original} & \textbf{Descripción} \\
+\midrule
+\texttt{promedio\_academico} & Numérica (Continuo) & Continuo & $[0.87 - 5.00]$ & Promedio acumulado (escala 0.0-5.0). \\
+\texttt{materias\_reprobadas} & Numérica (Entero) & Discreto & $[0 - 12]$ materias & Acumulado de materias reprobadas. \\
+\texttt{puntaje\_icfes\_percentil} & Numérica (Entero) & Discreto & $[1 - 100]$ percentil & Percentil obtenido en Saber 11. \\
+\texttt{semestre\_cursado} & Numérica (Entero) & Discreto & $[1 - 12]$ semestres & Semestre actual matriculado. \\
+\texttt{nivel\_formacion} & Categórica & Nominal & 3 niveles & Nivel del programa académico. \\
+\texttt{metodologia} & Categórica & Nominal & 3 modalidades & Modalidad de impartición. \\
+\texttt{area\_conocimiento} & Categórica & Nominal & 8 áreas & Área disciplinar del programa. \\
+\bottomrule
+\end{tabularx}
+\caption{Variables académicas del estudiante.}
+\end{table}
+
+\subsection{Variables Socioeconómicas, Familiares y Financieras}
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l l l l X}
+\toprule
+\textbf{Variable} & \textbf{Tipo de Dato} & \textbf{Tipo Rango} & \textbf{Rango Original} & \textbf{Descripción} \\
+\midrule
+\texttt{estrato\_socioeconomico} & Numérica (Entero) & Ordinal & $[1 - 6]$ & Estrato residencial del estudiante. \\
+\texttt{nivel\_educativo\_padre} & Categórica & Ordinal & 6 niveles & Nivel educativo del padre. \\
+\texttt{nivel\_educativo\_madre} & Categórica & Ordinal & 6 niveles & Nivel educativo de la madre. \\
+\texttt{sector\_ies} & Categórica & Nominal & \texttt{'Publico'}, \texttt{'Privado'} & Sector de la institución IES. \\
+\texttt{trabaja\_mientras\_estudia} & Numérica (Binario) & Binario & $0$ (No), $1$ (Sí) & Indicador de empleo simultáneo. \\
+\texttt{beneficiario\_icetex} & Numérica (Binario) & Binario & $0$ (No), $1$ (Sí) & Indicador de apoyo ICETEX. \\
+\texttt{beneficiario\_beca} & Numérica (Binario) & Binario & $0$ (No), $1$ (Sí) & Indicador de beca institucional. \\
+\texttt{anio\_registro} & Numérica (Entero) & Discreto & $[2021 - 2025]$ & Año de ingreso a la cohorte. \\
+\bottomrule
+\end{tabularx}
+\caption{Variables socioeconómicas, familiares y financieras.}
+\end{table}
+
+\section{Criterio y Formulación de la Variable Objetivo (\texttt{desercion})}
+
+La variable respuesta $\text{desercion}_i \in \{0, 1\}$ se definió mediante un índice de riesgo continuo ponderado $R_i \in [0, 7.5]$:
+
+\begin{align}
+R_i = \; & 2.5 \cdot \mathbb{I}(\text{promedio} < 3.0) + 2.5 \cdot \mathbb{I}(\text{reprobadas} \ge 2) \nonumber \\
+& + 1.0 \cdot \mathbb{I}(\text{icfes} < 40) + 1.0 \cdot \mathbb{I}(\text{trabaja} = 1) \nonumber \\
+& + 0.5 \cdot \mathbb{I}(\text{beca} = 0) + 0.5 \cdot \mathbb{I}(\text{estrato} \le 2)
+\end{align}
+
+La regla de decisión asigna la etiqueta de deserción mediante el umbral crítico de $3.5$ puntos:
+\begin{equation}
+\text{desercion}_i = \begin{cases} 1 & \text{si } R_i \ge 3.5 \quad (\text{Deserción: 33.59\%}) \\ 0 & \text{si } R_i < 3.5 \quad (\text{Permanencia: 66.41\%}) \end{cases}
+\end{equation}
+
+\section{Estadísticas Descriptivas Pre-Normalización}
+
+La Tabla \ref{tab:stats} sintetiza las métricas descriptivas calculadas sobre las 11,500 observaciones originales:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{l c c c c c c}
+\toprule
+\textbf{Variable} & \textbf{Media} & \textbf{Desv. Est.} & \textbf{Mínimo} & \textbf{Mediana} & \textbf{Máximo} & \textbf{Rango Original} \\
+\midrule
+\texttt{edad\_ingreso} & 19.57 & 2.96 & 15.00 & 19.00 & 32.00 & $[15.00 - 32.00]$ \\
+\texttt{promedio\_academico} & 3.41 & 0.63 & 0.87 & 3.41 & 5.00 & $[0.87 - 5.00]$ \\
+\texttt{materias\_reprobadas} & 1.09 & 1.20 & 0.00 & 1.00 & 12.00 & $[0.00 - 12.00]$ \\
+\texttt{distancia\_hogar\_ies\_km} & 11.12 & 12.52 & 0.22 & 7.43 & 250.00 & $[0.22 - 250.00]$ \\
+\texttt{puntaje\_icfes\_percentil} & 57.96 & 17.80 & 1.00 & 58.00 & 100.00 & $[1.00 - 100.00]$ \\
+\texttt{semestre\_cursado} & 6.53 & 3.44 & 1.00 & 7.00 & 12.00 & $[1.00 - 12.00]$ \\
+\texttt{estrato\_socioeconomico} & 2.61 & 1.20 & 1.00 & 2.00 & 6.00 & $[1.00 - 6.00]$ \\
+\texttt{anio\_registro} & 2023.31 & 1.27 & 2021.00 & 2023.00 & 2025.00 & $[2021.00 - 2025.00]$ \\
+\texttt{trabaja\_mientras\_estudia} & 0.38 & 0.48 & 0.00 & 0.00 & 1.00 & $[0.00 - 1.00]$ \\
+\texttt{beneficiario\_icetex} & 0.22 & 0.41 & 0.00 & 0.00 & 1.00 & $[0.00 - 1.00]$ \\
+\texttt{beneficiario\_beca} & 0.19 & 0.39 & 0.00 & 0.00 & 1.00 & $[0.00 - 1.00]$ \\
+\bottomrule
+\end{tabular}
+\caption{Estadísticas descriptivas de las variables numéricas originales.}
+\label{tab:stats}
+\end{table}
+
+\section{Justificación del Escalamiento para SVM}
+
+El clasificador SVM con \textbf{Kernel RBF} calcula la norma euclidiana $\|x - x'\|^2$:
+\begin{equation}
+K(x, x') = \exp\left(-\gamma \|x - x'\|^2\right)
+\end{equation}
+
+Debido a la disparidad entre la variable \texttt{distancia\_hogar\_ies\_km} ($\Delta = 249.78$) y \texttt{promedio\_academico} ($\Delta = 4.13$), el término de norma euclidiana se sesga hacia las características de mayor magnitud sin escalamiento previo, afectando la frontera de decisión.
+
+\section{Configuración e Hiperparámetros de SVM (\texttt{SVC})}
+
+Se empleó la siguiente configuración del estimador \texttt{SVC}:
+\begin{equation}
+\text{SVC}(\text{kernel}=\text{'rbf'}, C=1.0, \gamma=\text{'scale'}, \text{cache\_size}=1000, \text{random\_state}=42)
+\end{equation}
+
+\begin{itemize}
+    \item \textbf{Kernel RBF}: Modela fronteras no lineales complejas mediante espacio característico de dimensión infinita.
+    \item \textbf{Margen Blando $C=1.0$}: Ofrece un balance estándar entre ancho de margen y tolerancia de errores.
+    \item \textbf{Coeficiente $\gamma=\text{'scale'}$}: Ajusta automáticamente $\gamma = \frac{1}{n\_features \cdot \text{Var}(X)}$.
+    \item \textbf{Caché RAM = 1000 MB}: Acelera la optimización cuadrática en el dataset de 11,500 registros.
+\end{itemize}
+
+\section{Métodos de Normalización Evaluados y Resultados}
+
+La Tabla \ref{tab:resultados} resume el desempeño comparativo en 10 iteraciones independientes de validación cruzada:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{l l c c c}
+\toprule
+\textbf{Método de Normalización} & \textbf{Fórmula} & \textbf{$F1$-Score} & \textbf{Desv. Est.} & \textbf{P-Valor vs Baseline} \\
+\midrule
+Power Transformer (Yeo-Johnson) & Transformación potencia $g_\lambda(x)$ & \textbf{0.908516} & 0.006546 & $1.35 \times 10^{-20}$ \\
+Standard Scaler & $z = (x - \mu)/\sigma$ & 0.905890 & 0.007009 & $2.57 \times 10^{-20}$ \\
+Quantile Transformer & $x' = G^{-1}(F_{emp}(x))$ & 0.843320 & 0.008075 & $1.75 \times 10^{-19}$ \\
+Min Max Scaler & $x' = (x - x_{\min})/(x_{\max} - x_{\min})$ & 0.837759 & 0.010349 & $1.73 \times 10^{-18}$ \\
+Max Absolute Scaler & $x' = x / |x_{\max}|$ & 0.836626 & 0.008938 & $4.69 \times 10^{-19}$ \\
+Sin Normalización (Baseline) & $x' = x$ & 0.000000 & 0.000000 & $1.00$ \\
+\bottomrule
+\end{tabular}
+\caption{Resultados empíricos de clasificación SVM bajo distintos escalamientos.}
+\label{tab:resultados}
+\end{table}
+
+\section{Conclusiones}
+La normalización de datos es indispensable para obtener hiperplanos generalizables en SVM. Los métodos que ajustan la varianza y normalidad (\texttt{PowerTransformer} y \texttt{StandardScaler}) obtienen el rendimiento más alto ($F1 > 0.90$).
+
+\end{document}
