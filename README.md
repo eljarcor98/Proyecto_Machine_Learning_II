@@ -2,7 +2,12 @@
 
 Este repositorio contiene el desarrollo del proyecto de investigación y modelamiento predictivo para la **Machine Learning II (2026-II)**. El trabajo aborda el problema de la deserción universitaria mediante la aplicación de **Máquinas de Soporte Vectorial (SVM)**, analizando de manera sistemática el impacto de múltiples técnicas de normalización y transformación de datos sobre el rendimiento del clasificador y la geometría del hiperplano de separación.
 
+### Documento Principal del Proyecto (PDF)
+El artículo formal completo se encuentra disponible directamente en la raíz de este repositorio para su consulta inmediata:
+* **[Maquinas_de_Soporte_Vectorial_para_la_Prediccion_Temprana_de_Desercion_Estudiantil_Universitaria.pdf](Maquinas_de_Soporte_Vectorial_para_la_Prediccion_Temprana_de_Desercion_Estudiantil_Universitaria.pdf)**
+
 ---
+
 
 ## 1. Descripción del Problema
 
