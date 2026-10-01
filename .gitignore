@@ -17,3 +17,9 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local workspace folders (consultation only)
+avances nicolas/
+avances sara/
+scratch/
+
