@@ -128,4 +128,3 @@ Proyecto/
 3. Las figuras resultantes se exportarán automáticamente a `resultados/figuras/` y la tabla de métricas a `resultados/metricas/resultados_svm_normalizacion.csv`.
 
 ---
-*Machine Learning II - Universidad 2026-II*
