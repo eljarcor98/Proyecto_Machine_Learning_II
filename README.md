@@ -52,11 +52,12 @@ Evaluación mediante validación cruzada ($k=5$) y métrica $F_1$:
 ## 4. Estructura del Repositorio
 
 ```text
-Proyecto/
-├── README.md
-├── datos/              # Brutos y procesados
-├── documentos/         # Artículos y reportes (PDF/Word)
-├── modelos/            # Artefactos serializados (.joblib, .pkl)
-├── notebooks/          # Jupyter Notebooks experimentales
-├── resultados/         # Figuras y tablas de métricas
-└── src/                # Código fuente modular en Python
+Proyecto_Machine_Learning_II-main/
+├── README.md                          # Documentación y guía del proyecto
+├── Maquinas_de_Soporte_Vectorial...pdf# Artículo científico final en PDF
+├── Documentos/                        # Propuesta, artículo y reportes técnicos
+├── datos/                             # Datasets utilizados en el proyecto
+├── modelos/                           # Modelos entrenados y serializados (.joblib)
+├── notebooks/                         # Cuadernos Jupyter con el análisis y experimentos
+├── resultados/                        # Gráficas, figuras y métricas de evaluación
+└── src/                               # Scripts de código fuente modular
