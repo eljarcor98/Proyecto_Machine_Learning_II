@@ -68,50 +68,50 @@
 
 \section{El problema planteado en el artículo}
 
-El artículo base seleccionado, titulado \textit{``Support Vector Machine for Predicting Student Dropout Under Different Normalization Methods''} \cite{boteju2024}, aborda la problemática de la deserción y el retraso en la graduación en la educación superior. Este fenómeno genera costos económicos y psicológicos significativos tanto para los estudiantes (endeudamiento y pérdida de tiempo) como para las instituciones (pérdida de eficiencia y recursos). La detección temprana de estudiantes en riesgo es un desafío complejo debido a la influencia multifactorial de variables socioeconómicas, demográficas y académicas \cite[pág.~8633]{boteju2024}.
+El artículo base que seleccionamos para nuestra propuesta, titulado \textit{``Support Vector Machine for Predicting Student Dropout Under Different Normalization Methods''} \cite{boteju2024}, aborda el abandono y el rezago académico en la educación superior. Este fenómeno representa un costo económico y personal alto para los estudiantes (endeudamiento, pérdida de tiempo y frustración vocacional) y para las universidades (deserción, pérdida de recursos y cupos desaprovechados). Detectar a tiempo qué estudiantes se encuentran en riesgo es un problema complejo debido a la confluencia de factores académicos, socioeconómicos e individuales \cite[pág.~8633]{boteju2024}.
 
 \section{El método usado en el artículo}
 
-El estudio implementa Máquinas de Soporte Vectorial (SVM) para clasificar el estado final del estudiante. Su núcleo metodológico radica en evaluar el impacto de técnicas diferentes de preprocesamiento y normalización de datos (como \texttt{StandardScaler}, \texttt{MinMaxScaler}, \texttt{OneHotEncoder}, \texttt{QuantileTransformer}, entre otros) sobre la capacidad predictiva del modelo \cite[pág.~8633]{boteju2024}. Validan los resultados mediante ejecuciones iterativas de 50 ensayos para garantizar estabilidad estadística \cite[pág.~8635]{boteju2024}.
+En el estudio original se implementan Máquinas de Soporte Vectorial (SVM) para predecir la situación académica final del estudiante. El núcleo de su aporte metodológico consiste en comparar cómo diferentes técnicas de preprocesamiento y escalado de datos (tales como \texttt{StandardScaler}, \texttt{MinMaxScaler}, \texttt{OneHotEncoder} y \texttt{QuantileTransformer}) inciden en la precisión del clasificador \cite[pág.~8633]{boteju2024}. Para evaluar la consistencia de los modelos y evitar conclusiones basadas en una sola división de datos, los autores validan sus resultados a lo largo de 50 repeticiones independientes \cite[pág.~8635]{boteju2024}.
 
 \subsection{Supuestos principales del artículo}
 \begin{itemize}
-    \item \textbf{Relaciones no lineales:} Los datos presentan relaciones complejas que pueden ser separadas en espacios de alta dimensión mediante el uso de funciones de kernel (truco del kernel).
-    \item \textbf{Sensibilidad al escalado:} La escala y la transformación de las características de entrada alteran de forma directa la posición de los hiperplanos de separación y los vectores de soporte, afectando la generalización del modelo.
-    \item \textbf{Multifactorialidad:} Las variables socioeconómicas, demográficas y académicas capturan las señales latentes de riesgo de abandono escolar.
+    \item \textbf{Relaciones no lineales en los datos:} Las variables del entorno estudiantil interactúan de forma compleja, por lo que una frontera lineal resulta insuficiente y se requiere proyectar los datos a un espacio de mayor dimensión mediante el truco del kernel.
+    \item \textbf{Alta sensibilidad al escalado:} Al basarse en distancias geométricas, las SVM son muy sensibles a la escala de las características; si los atributos no se normalizan, la posición del hiperplano de separación y los vectores de soporte se ven distorsionados.
+    \item \textbf{Naturaleza multifactorial del abandono:} Las variables socioeconómicas, demográficas y académicas aportan señales complementarias sobre la propensión al retiro del estudiante.
 \end{itemize}
 
 \subsection{Resultados reportados y limitaciones}
 \begin{itemize}
-    \item \textbf{Resultados:} Se demostró que el preprocesamiento es crítico; los métodos escalados superan ampliamente a los modelos sin normalización.
-    \item \textbf{Limitaciones:} El estudio se limita a un dataset específico de la UC Irvine de 4,424 registros y explora un conjunto cerrado de transformaciones, dejando abierta la discusión sobre cómo se comportan estas técnicas frente a clases altamente desbalanceadas en contextos institucionales específicos de América Latina.
+    \item \textbf{Resultados obtenidos:} Los autores demostraron que el preprocesamiento es decisivo: los modelos escalados superaron ampliamente al clasificador sin normalizar, alcanzando mejoras significativas en la métrica $F_1$.
+    \item \textbf{Limitaciones identificadas:} El artículo evalúa un conjunto cerrado de datos de la plataforma UC Irvine (4,424 registros de una sola institución) y no profundiza en el comportamiento de las técnicas frente al desbalance de clases ni en la interpretabilidad práctica de los vectores de soporte para la toma de decisiones institucionales en el contexto latinoamericano.
 \end{itemize}
 
 \section{Planteamiento del Problema en un Contexto Local}
 
 \subsection{Pregunta de investigación}
-¿Es posible predecir de manera temprana el riesgo de deserción académica en estudiantes universitarios de pregrado en Colombia mediante un flujo robusto de Machine Learning basado en SVM, optimizando el rendimiento predictivo a través de técnicas avanzadas de normalización de datos y proveyendo interpretabilidad institucional a las decisiones del modelo?
+¿Es posible predecir oportunamente el riesgo de deserción en estudiantes de educación superior en Colombia mediante un pipeline modular de SVM, optimizando la capacidad predictiva a través de métodos de normalización y dotando de interpretabilidad práctica a las decisiones del modelo para apoyar los programas de permanencia universitaria?
 
 \subsection{Tipo de tarea}
-Problema de clasificación multiclase con 3 categorías mutuamente excluyentes conforme a los estándares oficiales del Ministerio de Educación Nacional de Colombia (MEN):
+La tarea se plantea como un problema de clasificación multiclase con tres estados mutuamente excluyentes, siguiendo las directrices oficiales del Ministerio de Educación Nacional de Colombia (MEN):
 \begin{itemize}
-    \item \textbf{Graduado:} Estudiante que culmina su plan de estudios exitosamente.
-    \item \textbf{En curso:} Estudiante activo que continúa su proceso formativo regular.
-    \item \textbf{Desertor:} Estudiante que abandona formal o informalmente el programa.
+    \item \textbf{Graduado:} Estudiantes que completaron la totalidad de sus créditos y requisitos de titulación.
+    \item \textbf{En curso:} Estudiantes activos que continúan matriculados con avance regular.
+    \item \textbf{Desertor:} Estudiantes que se desvinculan del programa académico por dos o más periodos consecutivos sin haberse graduado.
 \end{itemize}
 
-Para mayor precisión analítica, se adoptan las definiciones institucionales de abandono:
+Para efectos del seguimiento institucional, distinguimos dos modalidades de retiro:
 \begin{description}[style=multiline, leftmargin=3.5cm]
-    \item[Abandono formal:] Ocurre cuando el estudiante realiza un trámite administrativo e institucional de retiro oficial (cancelación de matrícula, solicitud formal de retiro).
-    \item[Abandono informal (silencioso):] Ocurre cuando el estudiante simplemente deja de asistir a clases, abandona las evaluaciones y no renueva matrícula, sin notificar a la universidad. Este abandono suele ser tardíamente detectado sin herramientas predictivas.
+    \item[Abandono formal:] Cuando el estudiante realiza el trámite administrativo de retiro o cancelación de matrícula ante la universidad.
+    \item[Abandono informal o silencioso:] Cuando el estudiante deja de asistir y no renueva matrícula sin previo aviso. Esta modalidad es la más difícil de anticipar y en la que un modelo predictivo temprano aporta mayor valor preventivo.
 \end{description}
 
 \section{Estrategia de Datos (Fundamentación SPADIES 3.0)}
 
-Se adoptó el marco conceptual y metodológico del Sistema para la Prevención y Análisis de la Deserción en las Instituciones de Educación Superior (SPADIES 3.0) del Ministerio de Educación Nacional de Colombia \cite{mineducacion2024} y los desarrollos del Sistema de Alerta Temprana (SAT-DE) \cite{penapico2024}.
+Para contextualizar el análisis en la realidad del país, adoptamos los criterios del Sistema para la Prevención de la Deserción en las Instituciones de Educación Superior (SPADIES 3.0) del Ministerio de Educación Nacional \cite{mineducacion2024}, así como las pautas de diseño de los Sistemas de Alerta Temprana (SAT-DE) \cite{penapico2024}.
 
 \subsection{Estructura del Dataset}
-El conjunto de datos comprende \textbf{11,500 registros de estudiantes} y \textbf{21 características predictoras} distribuidas en dimensiones académicas, socioeconómicas y demográficas. La variable objetivo multiclase fue formulada mediante el Índice de Riesgo Ponderado SPADIES ($R_i \in [0.0, 8.0]$), asignando condición de deserción a estudiantes con $R_i \ge 3.5$, graduación para aquellos con semestre mayor a la duración nominal y promedio acumulado $\ge 3.2$, y permanencia activa (en curso) para los demás casos.
+El conjunto de datos comprende \textbf{11,500 registros de estudiantes} y \textbf{21 variables predictoras} que abarcan dimensiones académicas, socioeconómicas y demográficas. Para definir el estado final de cada estudiante, formulamos un índice continuo de vulnerabilidad institucional ($R_i \in [0.0, 8.0]$), etiquetando como desertores a quienes superan el umbral crítico ($R_i \ge 3.5$), graduados a quienes alcanzaron el avance esperado con rendimiento aprobatorio ($\ge 3.2$), y en curso al resto de la cohorte.
 
 \begin{table}[htbp]
 \centering
@@ -141,7 +141,7 @@ El conjunto de datos comprende \textbf{11,500 registros de estudiantes} y \textb
 
 \section{Análisis Exploratorio Visual de Datos (EDA)}
 
-En lugar de limitarse a tablas numéricas, el análisis exploratorio se fundamenta en la interpretación visual del comportamiento de las características. La Figura \ref{fig:eda_distribucion} presenta la composición global de las cohortes y el contraste entre correlaciones lineales y no lineales.
+Para comprender a fondo la dinámica de los datos antes de pasar a la etapa de modelado, realizamos una exploración visual centrada en dos frentes: la distribución poblacional de las clases y la naturaleza de las correlaciones frente al riesgo de deserción (Figura \ref{fig:eda_distribucion}).
 
 \begin{figure}[htbp]
 \centering
@@ -152,12 +152,12 @@ En lugar de limitarse a tablas numéricas, el análisis exploratorio se fundamen
 
 \subsection{Interpretación de la Figura \ref{fig:eda_distribucion}}
 \begin{enumerate}
-    \item \textbf{Composición Muestral y Desbalance Controlado}: La población estudiantil presenta un $44.7\%$ de estudiantes activos (\texttt{En curso}, 5,137 registros), un $33.6\%$ en condición de abandono (\texttt{Desertor}, 3,863 registros) y un $21.7\%$ titulados (\texttt{Graduado}, 2,500 registros). Esta proporción refleja fielmente las tasas de retención observadas en la educación superior en Colombia.
-    \item \textbf{No Linealidad del Fenómeno (Pearson vs. Spearman)}: Al comparar las correlaciones lineales con las monótonas, se evidencia que variables críticas como el \texttt{promedio\_academico} y las \texttt{materias\_reprobadas} exhiben magnitudes de correlación significativamente mayores bajo el coeficiente de Spearman. Esto demuestra que la deserción no sigue un deterioro lineal continuo, sino un comportamiento de umbral abrupto: cuando el promedio desciende de un nivel crítico (3.0), la probabilidad de abandono se dispara. Esta no linealidad justifica plenamente el empleo de Máquinas de Soporte Vectorial con kernel RBF frente a regresiones lineales tradicionales.
+    \item \textbf{Distribución de la población estudiantil}: La cohorte presenta un $44.7\%$ de estudiantes activos (\texttt{En curso}, 5,137 registros), un $33.6\%$ en deserción (\texttt{Desertor}, 3,863 registros) y un $21.7\%$ titulados (\texttt{Graduado}, 2,500 registros). Esta proporción refleja de manera consistente el comportamiento observado en la educación superior en Colombia.
+    \item \textbf{No linealidad del fenómeno (Pearson vs. Spearman)}: Al comparar la correlación lineal con la de rango, observamos que factores clave como el \texttt{promedio\_academico} y las \texttt{materias\_reprobadas} muestran asociaciones mucho más fuertes bajo Spearman que bajo Pearson. Esto indica que la deserción no sigue un deterioro lineal continuo, sino un efecto de umbral: cuando el promedio cae por debajo de 3.0 o se acumulan asignaturas perdidas, la probabilidad de abandono se eleva bruscamente. Esta no linealidad justifica el uso de un kernel RBF frente a modelos lineales convencionales.
 \end{enumerate}
 
 \subsection{El Valle Académico de la Deserción}
-La Figura \ref{fig:eda_variables_clave} contrasta la dispersión de las dos variables académicas más influyentes entre los tres estados de los estudiantes.
+En la Figura \ref{fig:eda_variables_clave} analizamos la dispersión de las dos variables académicas más influyentes entre los tres estados estudiantiles.
 
 \begin{figure}[htbp]
 \centering
@@ -166,21 +166,21 @@ La Figura \ref{fig:eda_variables_clave} contrasta la dispersión de las dos vari
 \label{fig:eda_variables_clave}
 \end{figure}
 
-Como se aprecia en la Figura \ref{fig:eda_variables_clave}, existe una separación nítida entre la población que culmina sus estudios y la que deserta:
+A partir de los diagramas de caja identificamos un patrón claro:
 \begin{itemize}
-    \item \textbf{Promedio Académico}: Los desertores presentan una mediana marcadamente inferior ($2.70$), concentrándose por debajo del umbral de aprobación ($3.0$), en contraste con los graduados cuya mediana se sitúa en $3.90$.
-    \item \textbf{Materias Reprobadas}: Mientras que los graduados y estudiantes en curso tienen una mediana de cero reprobadas, los desertores exhiben una dispersión amplia con concentración en 2 o más asignaturas perdidas, configurando el síntoma más temprano de desconexión institucional.
+    \item \textbf{Promedio Académico}: La mediana de los estudiantes que desertan se ubica en $2.70$, concentrándose por debajo del umbral mínimo de aprobación ($3.0$), mientras que los graduados presentan una mediana de $3.90$.
+    \item \textbf{Materias Reprobadas}: Mientras que los graduados y estudiantes en curso registran una mediana de cero reprobadas, los desertores presentan una dispersión amplia con concentración en 2 o más materias perdidas, lo que constituye la señal de alerta temprana más evidente de desconexión académica.
 \end{itemize}
 
 \section{El Impacto de la Escala y Demostración de Normalizadores}
 
-Las Máquinas de Soporte Vectorial dependen intrínsecamente del cálculo de distancias geométricas en el espacio inducido:
+El clasificador SVM se fundamenta en calcular distancias geométricas en el espacio de características. En el caso del kernel de Base Radial (RBF):
 \begin{equation}
 K(x_i, x_j) = \exp\left(-\gamma \|x_i - x_j\|^2\right)
 \end{equation}
-Si una característica posee una escala numérica órdenes de magnitud superior a las demás, dominará artificialmente la norma euclidiana $\|x_i - x_j\|^2$, anulando la capacidad del clasificador para aprender de variables con menor rango pero mayor poder discriminante (como el promedio de 0 a 5).
+Si dejamos las variables en su escala numérica original, aquellas con rangos amplios —como la distancia al campus en kilómetros o el percentil ICFES— dominarán artificialmente la norma euclidiana $\|x_i - x_j\|^2$. Esto opaca a variables de menor magnitud pero de mayor poder discriminante, como el promedio acumulado (escala 0 a 5).
 
-La variable \texttt{distancia\_hogar\_ies\_km} representa el caso más severo en el dataset, al presentar una asimetría positiva extrema ($\text{Skewness} = +5.05$) con un $7.17\%$ de valores atípicos (estudiantes de regiones remotas a más de 50 km). La Figura \ref{fig:eda_efecto_escaladores} muestra empíricamente cómo reacciona esta variable ante seis métodos de transformación.
+La variable \texttt{distancia\_hogar\_ies\_km} representa el caso más marcado de asimetría positiva en el dataset ($\text{Skewness} = +5.05$), con un $7.17\%$ de registros atípicos correspondientes a estudiantes de municipios lejanos (más de 50 km). En la Figura \ref{fig:eda_efecto_escaladores} evaluamos cómo responde esta variable ante seis métodos de escalado.
 
 \begin{figure}[htbp]
 \centering
@@ -191,16 +191,16 @@ La variable \texttt{distancia\_hogar\_ies\_km} representa el caso más severo en
 
 \subsection{Interpretación Visual de los Escaladores (Figura \ref{fig:eda_efecto_escaladores})}
 \begin{itemize}
-    \item \textbf{1. Escala Original (Raw)}: Presenta una cola alargada hacia la derecha que colapsaría el cálculo de distancias en SVM.
-    \item \textbf{2. StandardScaler}: Centra la masa en cero, pero los valores extremos se extienden hasta $Z > 10$, manteniendo cierta vulnerabilidad ante outliers.
-    \item \textbf{3. MinMaxScaler}: Comprime toda la masa poblacional en un intervalo estrecho cercano a 0 debido al efecto de los valores máximos alejados.
-    \item \textbf{4. RobustScaler}: Utiliza la mediana y el rango intercuartílico ($IQR$), evitando que los estudiantes de zonas rurales distorsionen la escala del 90\% restante.
-    \item \textbf{5. QuantileTransformer y 6. PowerTransformer}: Logran una transformación cuasi-gaussiana y uniforme respectivamente, estabilizando la varianza y mitigando por completo el sesgo de la cola larga.
+    \item \textbf{Escala Original (Raw)}: Muestra una cola alargada hacia la derecha que concentraría las distancias y distorsionaría el margen del clasificador.
+    \item \textbf{StandardScaler}: Centra la distribución en cero y escala por desviación estándar, aunque mantiene colas largas en presencia de valores extremos ($Z > 10$).
+    \item \textbf{MinMaxScaler}: Comprime la gran mayoría de observaciones en una franja muy estrecha cercana a 0 debido al efecto de los valores máximos alejados.
+    \item \textbf{RobustScaler}: Al apoyarse en la mediana y el rango intercuartílico ($IQR$), escala el 90\% central de la población sin dejarse alterar por los estudiantes que viven en zonas remotas.
+    \item \textbf{QuantileTransformer y PowerTransformer}: Logran estabilizar la varianza aproximando la distribución a una forma normal y uniforme respectivamente, eliminando el sesgo de la cola larga.
 \end{itemize}
 
 \section{Resultados Experimentales: Ranking de Normalizadores}
 
-Para validar el impacto del escalado de forma reproducible y sin fuga de datos, se ejecutó un experimento de \textbf{50 particiones independientes} ($N=50$ \textit{trials}), entrenando 400 modelos SVM mediante \texttt{Pipeline} y \texttt{ColumnTransformer}. La Figura \ref{fig:ranking_normalizadores} resume el desempeño comparativo en $F_1$-Score Ponderado.
+Para comparar los normalizadores de forma rigurosa y sin fuga de datos (*data leakage*), diseñamos un experimento con \textbf{50 particiones independientes} ($N=50$ particiones Monte Carlo estratificadas al 80/20), entrenando 400 modelos mediante \texttt{Pipeline} de Scikit-Learn. La Figura \ref{fig:ranking_normalizadores} resume el rendimiento en $F_1$-Score Ponderado.
 
 \begin{figure}[htbp]
 \centering
@@ -234,22 +234,22 @@ Para validar el impacto del escalado de forma reproducible y sin fuga de datos, 
 
 \subsection{Interpretación de los Resultados}
 \begin{enumerate}
-    \item \textbf{El Colapso del Modelo Baseline}: El clasificador sin normalizar obtiene un pobre $F_1$ ponderado de $0.4792$ y un $F_1$ macro de $0.4097$. La ausencia de escalado degrada catastróficamente la geometría del margen blando de SVM.
-    \item \textbf{Liderazgo de \texttt{StandardScaler} y \texttt{PowerTransformer}}: Ambos métodos incrementan el rendimiento en más de \textbf{+40 puntos porcentuales (+85\% de mejora)} frente al baseline, alcanzando un $F_1 \approx 0.8878$ con una dispersión mínima ($\sigma \approx 0.006$), demostrando una gran estabilidad a lo largo de las 50 particiones.
-    \item \textbf{Fallo de la Codificación Ordinal}: Tratar variables cualitativas mediante índices secuenciales arbitrarios genera relaciones espaciales ficticias que desorientan al kernel SVM, resultando en un $F_1$ nulo para la detección de desertores.
+    \item \textbf{El colapso del modelo baseline}: Sin normalización, el clasificador alcanza un pobre $F_1$ ponderado de $0.4792$ y un $F_1$ macro de $0.4097$. La falta de escalamiento rompe la geometría del margen blando, haciendo que el modelo pierda precisión de manera generalizada.
+    \item \textbf{Consistencia de \texttt{StandardScaler} y \texttt{PowerTransformer}}: Ambos métodos elevan el desempeño en más de \textbf{+40 puntos porcentuales (+85\% de mejora)} frente a la línea base, alcanzando un $F_1 \approx 0.8878$ con una dispersión mínima ($\sigma \approx 0.006$) que ratifica la estabilidad del resultado a lo largo de las 50 particiones.
+    \item \textbf{El error de la codificación ordinal}: Asignar números arbitrarios a categorías no ordenadas introduce distancias artificiales que desorientan al kernel SVM, provocando la pérdida total de sensibilidad hacia la clase de desertores.
 \end{enumerate}
 
 \section{Interpretabilidad del Modelo SVM y Espacio de Frontera}
 
-Una de las críticas frecuentes hacia los clasificadores SVM con kernel no lineal (como el kernel RBF) es su percepción como modelos de ``caja negra'' debido a que la separación ocurre en un espacio de Hilbert de dimensión infinita. Para superar esta limitación y responder a la necesidad institucional de decisiones comprensibles y accionables, se abordó la interpretabilidad desde dos ángulos complementarios:
+Una de las críticas más habituales hacia los clasificadores SVM con kernel no lineal (como el kernel RBF) es que suelen percibirse como modelos de ``caja negra'' debido a que la separación ocurre en un espacio de Hilbert de dimensión infinita. Para superar esta limitación y ofrecer herramientas comprensibles y accionables a los programas de permanencia universitaria, abordamos la interpretabilidad desde dos ángulos complementarios:
 \begin{enumerate}
-    \item \textbf{Interpretabilidad Geométrica Directa}: Mapeo de la frontera de decisión, márgenes y vectores de soporte sobre las variables académicas con mayor impacto pedagógico directo (Figura \ref{fig:hiperplano_frontera}), junto con la distribución de distancias funcionales al hiperplano (Figura \ref{fig:distancia_hiperplano}).
-    \item \textbf{Interpretabilidad Global por Permutación}: Cuantificación objetiva del impacto de cada atributo sobre el desempeño predictivo multiclase (Figura \ref{fig:importancia_variables}).
+    \item \textbf{Interpretabilidad geométrica directa}: En lugar de recurrir a componentes abstractas de PCA que resultan difíciles de traducir al quehacer pedagógico, mapeamos la frontera de decisión, los márgenes y los vectores de soporte sobre las variables académicas con mayor impacto operativo (Figura \ref{fig:hiperplano_frontera}), junto con la distribución de distancias funcionales al hiperplano (Figura \ref{fig:distancia_hiperplano}).
+    \item \textbf{Interpretabilidad global por permutación}: Cuantificamos el impacto real de cada atributo sobre el desempeño predictivo multiclase mediante la caída en $F_1$-Score al permutar sus valores en el conjunto de prueba (Figura \ref{fig:importancia_variables}).
 \end{enumerate}
 
 \subsection{Geometría del Hiperplano y Significado de los Vectores de Soporte}
 
-Para evitar la pérdida de interpretabilidad provocada por técnicas de reducción como PCA (donde los componentes abstractos diluyen la intuición pedagógica), la Figura \ref{fig:hiperplano_frontera} proyecta la superficie de decisión del SVM directamente sobre el plano conformado por las dos variables de mayor impacto: el \textbf{Promedio Académico} (eje horizontal, escala 0.0 a 5.0) y las \textbf{Materias Reprobadas} acumuladas (eje vertical).
+Para facilitar la toma de decisiones institucionales, la Figura \ref{fig:hiperplano_frontera} proyecta la superficie de decisión del SVM directamente sobre el plano formado por las dos variables con mayor peso predictivo: el \textbf{Promedio Académico} (eje horizontal, escala 0.0 a 5.0) y las \textbf{Materias Reprobadas} acumuladas (eje vertical).
 
 \begin{figure}[htbp]
 \centering
@@ -260,23 +260,23 @@ Para evitar la pérdida de interpretabilidad provocada por técnicas de reducci�
 
 \subsubsection{Lectura Institucional de la Frontera de Decisión (Figura \ref{fig:hiperplano_frontera})}
 \begin{enumerate}
-    \item \textbf{La Frontera de Decisión ($f(x) = 0$, línea roja continua)}: Representa el umbral exacto donde el clasificador cambia su predicción de Permanencia a Deserción. La geometría no lineal revela que un estudiante con un promedio relativamente aceptable (por ejemplo, 3.2 a 3.4) cruza inmediatamente a la zona de deserción si acumula 2 o más materias reprobadas. A la inversa, estudiantes con 0 materias reprobadas toleran promedios más cercanos a 3.0 antes de ser clasificados en abandono.
-    \item \textbf{El Corredor del Margen ($f(x) = +1$ y $f(x) = -1$, líneas discontinuas)}: Delimita la banda de máxima separación inducida por la regularización de margen blando ($C=1.0$). El espacio entre ambas líneas punteadas define la \textbf{zona de transición o incertidumbre institucional}.
-    \item \textbf{Los Vectores de Soporte como Estudiantes en Riesgo Crítico (halos negros)}: En la teoría de SVM, los vectores de soporte son únicamente las observaciones que tocan o violan los márgenes ($|f(x)| \le 1$ o con variables de holgura $\xi_i > 0$). Lejos de ser meros puntos matemáticos, en la gestión universitaria representan a los \textbf{estudiantes límite}:
+    \item \textbf{La Frontera de Decisión ($f(x) = 0$, línea roja continua)}: Señala el umbral en el que el clasificador cambia su predicción de Permanencia a Deserción. La curvatura no lineal muestra que un estudiante con un promedio relativamente aceptable (por ejemplo, 3.2 a 3.4) cruza inmediatamente a la zona de riesgo si acumula 2 o más materias reprobadas. En contraste, quienes no tienen materias perdidas toleran promedios más cercanos a 3.0 antes de encender las alertas de abandono.
+    \item \textbf{El Corredor del Margen ($f(x) = +1$ y $f(x) = -1$, líneas discontinuas)}: Delimita la banda de máxima separación inducida por el parámetro de regularización ($C=1.0$). El espacio entre ambas líneas punteadas define la \textbf{zona de transición o incertidumbre institucional}.
+    \item \textbf{Los Vectores de Soporte como Estudiantes en Riesgo Crítico (halos negros)}: En la teoría de SVM, los vectores de soporte son únicamente las observaciones que tocan o cruzan el margen ($|f(x)| \le 1$). En el contexto universitario, estos puntos no son simples referencias matemáticas: representan a los \textbf{estudiantes que se encuentran en la cuerda floja}:
     \begin{itemize}
-        \item No son los estudiantes que desertan con certeza absoluta (aquellos ubicados muy arriba a la izquierda, con promedios inferiores a 2.0 y más de 4 materias reprobadas).
-        \item Tampoco son los estudiantes seguros en permanencia (promedio superior a 4.0 y 0 reprobadas).
-        \item Son estudiantes en la cuerda floja: un leve deterioro académico o financiero los empuja definitivamente a la deserción, pero una intervención institucional oportuna (tutoría en la materia reprobada o subsidio de transporte/alimentación) tiene la máxima probabilidad de rescatarlos y cruzarlos a la zona segura.
+        \item No son los estudiantes que desertan con certeza absoluta (aquellos con promedios muy bajos y más de 4 materias reprobadas).
+        \item Tampoco son los estudiantes con permanencia consolidada (promedio superior a 4.0 y cero reprobadas).
+        \item Son estudiantes en la frontera: una pequeña dificultad adicional puede inclinarlos hacia el abandono, pero una intervención institucional oportuna (como una tutoría intensiva en la materia perdida o un auxilio de transporte) tiene la máxima probabilidad de rescatarlos y mantenerlos en el sistema.
     \end{itemize}
 \end{enumerate}
 
 \subsection{Distribución de la Distancia Funcional al Hiperplano}
 
-Para operacionalizar el modelo en un Sistema de Alerta Temprana (SAT), no basta con una clasificación binaria rígida. La función de decisión de SVM proporciona una métrica continua de distancia orientada:
+Para operacionalizar el modelo en un Sistema de Alerta Temprana (SAT), no basta con una etiqueta binaria rígida. La función de decisión de SVM proporciona una medida continua de distancia con signo:
 \begin{equation}
 f(x) = \sum_{i \in SV} y_i \alpha_i K(x_i, x) + b
 \end{equation}
-donde el signo indica la clase predicha y la magnitud $|f(x)|$ mide el grado de certeza o margen de seguridad de la trayectoria del estudiante. La Figura \ref{fig:distancia_hiperplano} expone la densidad poblacional de estas distancias en el conjunto de prueba.
+donde el signo indica la clase predicha y la magnitud $|f(x)|$ mide el grado de certeza o margen de seguridad de la trayectoria estudiantil. La Figura \ref{fig:distancia_hiperplano} muestra la densidad de estas distancias en el conjunto de prueba.
 
 \begin{figure}[htbp]
 \centering
@@ -287,13 +287,13 @@ donde el signo indica la clase predicha y la magnitud $|f(x)|$ mide el grado de 
 
 \subsubsection{Estratificación del Riesgo para la Política Institucional}
 \begin{itemize}
-    \item \textbf{Zona de Deserción Consolidada ($f(x) < -1$)}: Representa el $28.3\%$ de la población evaluada. Estudiantes con severo deterioro académico acumulado que requieren programas intensivos de readmisión, homologación y acompañamiento vocacional integral.
-    \item \textbf{Franja de Vectores de Soporte / Riesgo Límite ($-1 \le f(x) \le +1$)}: Corresponde al $19.4\%$ del estudiantado. Es el \textbf{foco estratégico de intervención de Bienestar Universitario}: estudiantes con alto potencial de retención si se actúa antes de la semana 6 del semestre académico.
-    \item \textbf{Zona de Permanencia Segura ($f(x) > +1$)}: Abarca el $52.3\%$ de los estudiantes, caracterizados por un avance curricular regular y sin señales tempranas de alarma.
+    \item \textbf{Zona de Deserción Consolidada ($f(x) < -1$)}: Representa el $28.3\%$ de la cohorte evaluada. Agrupa a estudiantes con rezago acumulado severo que requieren programas intensivos de readmisión, homologación y acompañamiento vocacional integral.
+    \item \textbf{Franja de Vectores de Soporte / Riesgo Límite ($-1 \le f(x) \le +1$)}: Corresponde al $19.4\%$ del estudiantado. Es el \textbf{foco estratégico prioritario para Bienestar Universitario}: estudiantes con alto potencial de retención si se actúa antes de la semana 6 del semestre.
+    \item \textbf{Zona de Permanencia Segura ($f(x) > +1$)}: Abarca el $52.3\%$ de los estudiantes, caracterizados por un avance curricular estable y sin alertas tempranas de riesgo.
 \end{itemize}
 
 \subsection{Importancia de Variables por Permutación (Permutation Importance)}
-Para determinar objetivamente qué factores causan el mayor impacto en la predicción sin recurrir a simplificaciones lineales, se calculó la importancia por permutación sobre el conjunto de prueba independiente ($n=2,300$). La Figura \ref{fig:importancia_variables} rankea las características según la caída que provocan en el $F_1$-Score al ser permutadas aleatoriamente.
+Para determinar de forma objetiva qué factores tienen mayor peso en la predicción sin suponer linealidad previa, calculamos la importancia por permutación sobre el conjunto de prueba independiente ($n=2,300$). La Figura \ref{fig:importancia_variables} ordena las características según la caída que ocasionan en el $F_1$-Score al alterar sus valores al azar.
 
 \begin{figure}[htbp]
 \centering
@@ -304,10 +304,10 @@ Para determinar objetivamente qué factores causan el mayor impacto en la predic
 
 \subsubsection{Interpretación Institucional de las Variables}
 \begin{enumerate}
-    \item \textbf{Semestre Cursado ($\Delta F_1 \approx 0.201$)}: Es el factor más influyente. La mayor vulnerabilidad se concentra en los primeros 3 semestres; a medida que el estudiante avanza en su plan de estudios, el costo de oportunidad del abandono se eleva y la deserción disminuye drásticamente.
-    \item \textbf{Rendimiento Académico Temprano}: El \texttt{promedio\_academico} ($\Delta F_1 \approx 0.185$) y las \texttt{materias\_reprobadas} ($\Delta F_1 \approx 0.182$) ocupan el segundo y tercer puesto de impacto directo. La pérdida de créditos acumulados es la señal precursora inequívoca de la deserción.
-    \item \textbf{Nivel de Formación ($\Delta F_1 \approx 0.081$)}: Los programas técnicos y tecnológicos exhiben dinámicas de deserción más aceleradas que las carreras universitarias tradicionales.
-    \item \textbf{Factores Socioeconómicos y Laborales}: La condición de \texttt{trabaja\_\allowbreak mientras\_\allowbreak estudia}, el \texttt{estrato\_socioeconomico} y el puntaje de ingreso \texttt{icfes} operan como factores estructurales de fondo que detonan o aceleran el bajo rendimiento académico.
+    \item \textbf{Semestre Cursado ($\Delta F_1 \approx 0.201$)}: Es el factor más determinante. La mayor vulnerabilidad se concentra en los primeros tres semestres; a medida que el estudiante avanza, el costo de oportunidad del abandono aumenta y la deserción disminuye significativamente.
+    \item \textbf{Rendimiento Académico Temprano}: El \texttt{promedio\_academico} ($\Delta F_1 \approx 0.185$) y las \texttt{materias\_reprobadas} ($\Delta F_1 \approx 0.182$) ocupan el segundo y tercer puesto de impacto directo. La pérdida de créditos acumulados es la señal precursora más clara del abandono.
+    \item \textbf{Nivel de Formación ($\Delta F_1 \approx 0.081$)}: Los programas técnicos y tecnológicos muestran dinámicas de deserción más aceleradas que las carreras universitarias tradicionales.
+    \item \textbf{Factores Socioeconómicos y Laborales}: La condición de \texttt{trabaja\_\allowbreak mientras\_\allowbreak estudia}, el \texttt{estrato\_socioeconomico} y el puntaje de ingreso \texttt{icfes} operan como factores estructurales que modulan o aceleran el bajo rendimiento académico.
 \end{enumerate}
 
 \section{Diagnóstico de Errores y Auditoría de Equidad (Fairness)}
@@ -322,14 +322,14 @@ La Figura \ref{fig:matriz_confusion} presenta la matriz de confusión multiclase
 \label{fig:matriz_confusion}
 \end{figure}
 
-El clasificador alcanza una \textbf{Exactitud global del $88.78\%$} y un \textbf{$F_1$-Score de $0.8877$}. Sin embargo, en el contexto de alertas tempranas, la métrica crítica es la tasa de detección de la clase de riesgo:
+El clasificador alcanza una \textbf{Exactitud global del $88.78\%$} y un \textbf{$F_1$-Score ponderado de $0.8877$}. No obstante, en un sistema de alerta temprana, la métrica clave de decisión es la sensibilidad hacia la clase en riesgo:
 \begin{itemize}
-    \item \textbf{Recall de Desertores ($92.11\%$)}: De los 773 estudiantes que realmente desertaron en el conjunto de prueba, el pipeline identificó oportunamente a 712.
-    \item \textbf{Minimización de Falsos Negativos}: Solo 61 desertores ($7.89\%$) no fueron detectados. En política universitaria, el coste social y financiero de un falso negativo (un estudiante en riesgo no detectado que finalmente abandona) es inmensamente superior al de un falso positivo (brindar tutoría a un estudiante que no la requería urgentemente).
+    \item \textbf{Recall de Desertores ($92.11\%$)}: De los 773 estudiantes que desertaron en la partición de prueba, el pipeline identificó oportunamente a 712.
+    \item \textbf{Minimización de Falsos Negativos}: Solo 61 desertores ($7.89\%$) no fueron detectados. En la gestión universitaria, el costo humano y social de un falso negativo (un estudiante en riesgo no detectado que finalmente abandona) es mucho más grave que el de un falso positivo (brindar tutoría a un estudiante que quizás no la requería con tanta urgencia).
 \end{itemize}
 
 \subsection{Auditoría de Sesgo Algorítmico por Subgrupo}
-Para garantizar que el modelo no discrimine en función de condiciones demográficas o institucionales, se auditó la tasa de acierto de deserción (\textit{Recall}) desglosada por subgrupos poblacionales (Tabla \ref{tab:subgrupos}).
+Para garantizar que el modelo no introduzca sesgos contra poblaciones específicas, auditamos la tasa de acierto de deserción (\textit{Recall}) desglosada por subgrupos demográficos e institucionales (Tabla \ref{tab:subgrupos}).
 
 \begin{table}[htbp]
 \centering
@@ -357,14 +357,14 @@ Para garantizar que el modelo no discrimine en función de condiciones demográf
 }
 \end{table}
 
-\textbf{Hallazgo de Equidad}: La variación del Recall entre subgrupos es inferior a 4 puntos porcentuales en todas las dimensiones evaluadas (por ejemplo, $91.97\%$ en hombres vs. $92.25\%$ en mujeres; $93.38\%$ en zonas rurales vs. $91.84\%$ en urbanas). Esto certifica que el modelo es robusto, imparcial y adecuado para operar de forma transparente en políticas de permanencia institucional.
+\textbf{Hallazgo de Equidad}: La variación del Recall entre subgrupos se mantiene por debajo de 4 puntos porcentuales en todas las dimensiones evaluadas ($91.97\%$ en hombres vs. $92.25\%$ en mujeres; $93.38\%$ en zonas rurales vs. $91.84\%$ en urbanas). Esto certifica que el clasificador se comporta de manera imparcial y es confiable para respaldar políticas institucionales.
 
 \section{Conclusiones y Recomendaciones Institucionales}
 
 \begin{enumerate}
-    \item \textbf{La normalización es un requisito estructural para SVM}: La disparidad de magnitudes distorsiona por completo la geometría de las distancias euclidianas del kernel RBF. La estandarización (\texttt{StandardScaler}) y las transformaciones estabilizadoras (\texttt{PowerTransformer}) no son ajustes cosméticos, sino el elemento determinante que eleva el $F_1$ de $0.41$ a $0.8878$.
-    \item \textbf{Transparencia mediante interpretabilidad en variables reales}: Lejos de comportarse como una caja negra inescrutable, el mapeo de fronteras de decisión sobre variables clave (\texttt{promedio\_academico} vs. \texttt{materias\_reprobadas}) y la métrica de distancia funcional al hiperplano $f(x)$ identifican con rigor pedagógico y operativo a los estudiantes en margen crítico (vectores de soporte), permitiendo priorizar recursos de tutorías y auxilios socioeconómicos antes de que se consume el abandono.
-    \item \textbf{Focalización en los primeros semestres}: La importancia de variables por permutación ratifica que los esfuerzos institucionales de retención deben desplegarse agresivamente durante los tres primeros periodos académicos, momento en el cual el promedio y las materias reprobadas tienen la máxima capacidad predictiva sobre la trayectoria del estudiante.
+    \item \textbf{La normalización es un requisito estructural para SVM}: La disparidad de magnitudes altera directamente el cálculo de distancias del kernel RBF. La estandarización (\texttt{StandardScaler}) y las transformaciones de potencia (\texttt{PowerTransformer}) no son simples pasos accesorios, sino la clave que permite elevar el rendimiento de $0.41$ a $0.8878$ en $F_1$-Score.
+    \item \textbf{Interpretabilidad aplicada a la permanencia universitaria}: Al proyectar las fronteras sobre variables reales (\texttt{promedio\_academico} vs. \texttt{materias\_reprobadas}) y calcular la distancia funcional al hiperplano $f(x)$, demostramos que el modelo no opera como una caja negra, sino que permite identificar y priorizar a los estudiantes en margen crítico (vectores de soporte) para los comités de retención estudiantil.
+    \item \textbf{Focalización preventiva en los primeros semestres}: La importancia de variables por permutación ratifica que los esfuerzos institucionales de acompañamiento deben concentrarse con fuerza durante los tres primeros periodos académicos, cuando el promedio y las materias reprobadas poseen su mayor capacidad anticipatoria.
 \end{enumerate}
 
 \vspace{0.4cm}
