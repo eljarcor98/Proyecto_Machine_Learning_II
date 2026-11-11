@@ -51,6 +51,8 @@ from src.utils import (
 )
 from src.visualization import (
     plot_confusion_matrices,
+    plot_decision_boundary_top2,
+    plot_decision_function_distribution,
     plot_eda_distributions,
     plot_key_variables_distribution,
     plot_normalization_comparison,
@@ -191,11 +193,19 @@ def main(n_trials: int = 50, n_jobs: int = -1):
     print(f"-> [OK] Figura guardada: {FIGURES_DIR / 'svm_importancia_variables.png'}")
 
     # -------------------------------------------------------------
-    # 5. VISUALIZACIÓN DEL HIPERPLANO 2D (PCA)
+    # 5. VISUALIZACIÓN DEL HIPERPLANO 2D (PCA) Y EN VARIABLES REALES
     # -------------------------------------------------------------
     print("\n5. VISUALIZANDO HIPERPLANO MULTICLASE EN ESPACIO LATENTE (PCA 2D)...")
     fig_pca, _ = plot_pca_hyperplane(best_pipeline, X_train, y_train, X_test, y_test)
     print(f"-> [OK] Figura guardada: {FIGURES_DIR / 'svm_hiperplano_pca_2d.png'}")
+
+    print("-> Generando visualización nítida del hiperplano en variables reales clave...")
+    plot_decision_boundary_top2(df)
+    print(f"-> [OK] Figura guardada: {FIGURES_DIR / 'svm_hiperplano_top2_variables.png'}")
+
+    print("-> Generando distribución de distancia funcional f(x) y margen de vectores de soporte...")
+    plot_decision_function_distribution(df)
+    print(f"-> [OK] Figura guardada: {FIGURES_DIR / 'svm_distancia_hiperplano_estudiantes.png'}")
 
     # -------------------------------------------------------------
     # 6. EVALUACIÓN DETALLADA Y AUDITORÍA DE EQUIDAD POR SUBGRUPO

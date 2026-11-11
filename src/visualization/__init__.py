@@ -9,7 +9,9 @@ from src.visualization.plots import (
     plot_normalization_comparison,
     plot_permutation_importance,
     plot_pca_hyperplane,
-    plot_confusion_matrices
+    plot_confusion_matrices,
+    plot_decision_boundary_top2,
+    plot_decision_function_distribution
 )
 
 __all__ = [
@@ -19,5 +21,7 @@ __all__ = [
     'plot_normalization_comparison',
     'plot_permutation_importance',
     'plot_pca_hyperplane',
-    'plot_confusion_matrices'
+    'plot_confusion_matrices',
+    'plot_decision_boundary_top2',
+    'plot_decision_function_distribution'
 ]

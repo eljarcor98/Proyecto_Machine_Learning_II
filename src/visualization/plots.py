@@ -556,3 +556,140 @@ def plot_confusion_matrices(
 
     plt.savefig(output_path, dpi=300)
     return fig, axes
+
+
+def plot_decision_boundary_top2(
+    df: pd.DataFrame,
+    features: Optional[List[str]] = None,
+    output_path: Optional[Union[str, Path]] = None,
+    sample_size: int = 300,
+    random_state: int = 42
+) -> Tuple[plt.Figure, Any]:
+    """
+    Genera la visualización cristalina del hiperplano de decisión de SVM y márgenes
+    sobre las dos variables predictoras de mayor relevancia (Promedio Académico y Materias Reprobadas).
+    Permite interpretar intuitivamente la separación de clases sin la abstracción del PCA.
+    """
+    if features is None:
+        features = ['promedio_academico', 'materias_reprobadas']
+
+    X = df[features].values
+    y_bin = (df['estado_final'] == 'Desertor').astype(int).values
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    svm = SVC(kernel='rbf', C=1.0, random_state=random_state)
+    svm.fit(X_scaled, y_bin)
+
+    x_min, x_max = X[:, 0].min(), X[:, 0].max()
+    y_min, y_max = X[:, 1].min(), X[:, 1].max()
+
+    xx, yy = np.meshgrid(np.linspace(x_min, x_max, 300), np.linspace(y_min, y_max, 300))
+    grid_scaled = scaler.transform(np.c_[xx.ravel(), yy.ravel()])
+    Z = svm.decision_function(grid_scaled).reshape(xx.shape)
+
+    fig, ax = plt.subplots(figsize=(10, 7))
+
+    # Regiones sombreadas suaves
+    ax.contourf(xx, yy, Z, levels=[-np.inf, 0, np.inf], colors=['#e0f3f8', '#fee0d2'], alpha=0.55)
+
+    # Contornos de decisión y márgenes
+    contours = ax.contour(
+        xx, yy, Z, levels=[-1.0, 0.0, 1.0],
+        linestyles=['--', '-', '--'],
+        colors=['#2b83ba', '#d7191c', '#2b83ba'],
+        linewidths=[1.8, 2.8, 1.8]
+    )
+    ax.clabel(
+        contours, inline=True, fontsize=10,
+        fmt={-1.0: 'Margen (-1)', 0.0: 'Hiperplano Separador f(x)=0', 1.0: 'Margen (+1)'}
+    )
+
+    # Submuestra limpia de estudiantes
+    np.random.seed(random_state)
+    sample_idx = np.random.choice(len(X), size=min(sample_size, len(X)), replace=False)
+    X_sub = X[sample_idx]
+    y_sub = y_bin[sample_idx]
+
+    ax.scatter(
+        X_sub[y_sub == 0, 0], X_sub[y_sub == 0, 1],
+        c='#2b83ba', label='Persistente (Graduado / En curso)',
+        alpha=0.7, edgecolors='k', s=45
+    )
+    ax.scatter(
+        X_sub[y_sub == 1, 0], X_sub[y_sub == 1, 1],
+        c='#d7191c', label='Desertor',
+        alpha=0.7, edgecolors='k', s=45
+    )
+
+    # Vectores de soporte en el espacio original de variables
+    sv_orig = scaler.inverse_transform(svm.support_vectors_)
+    sv_sample = sv_orig[np.random.choice(len(sv_orig), size=min(60, len(sv_orig)), replace=False)]
+    ax.scatter(
+        sv_sample[:, 0], sv_sample[:, 1],
+        s=130, facecolors='none', edgecolors='black', linewidths=2.0,
+        label=f'Vectores de Soporte (Muestra de {len(svm.support_vectors_)} puntos límite)'
+    )
+
+    ax.set_title('Frontera de Decisión e Hiperplano SVM en Variables Críticas', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Promedio Académico Acumulado (0.0 - 5.0)', fontsize=12)
+    ax.set_ylabel('Materias Reprobadas (0 - 8)', fontsize=12)
+    ax.legend(loc='upper right', frameon=True, facecolor='white', framealpha=0.92)
+
+    plt.tight_layout()
+
+    if output_path is None:
+        FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+        output_path = FIGURES_DIR / "svm_hiperplano_top2_variables.png"
+
+    plt.savefig(output_path, dpi=300)
+    return fig, ax
+
+
+def plot_decision_function_distribution(
+    df: pd.DataFrame,
+    num_cols: Optional[List[str]] = None,
+    output_path: Optional[Union[str, Path]] = None,
+    random_state: int = 42
+) -> Tuple[plt.Figure, Any]:
+    """
+    Figura de interpretabilidad 1D: Distribución de distancias funcionales al hiperplano f(x)
+    y visualización de los márgenes y vectores de soporte.
+    """
+    if num_cols is None:
+        num_cols = ['promedio_academico', 'materias_reprobadas', 'semestre_cursado', 'distancia_hogar_ies_km', 'estrato_socioeconomico']
+
+    X = df[num_cols].values
+    y_bin = (df['estado_final'] == 'Desertor').astype(int).values
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    svm = SVC(kernel='rbf', C=1.0, random_state=random_state)
+    svm.fit(X_scaled, y_bin)
+
+    dfunc = svm.decision_function(X_scaled)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.histplot(dfunc[y_bin == 0], color='#2b83ba', kde=True, label='Estudiantes Persistentes', stat='density', alpha=0.5, ax=ax)
+    sns.histplot(dfunc[y_bin == 1], color='#d7191c', kde=True, label='Estudiantes Desertores', stat='density', alpha=0.5, ax=ax)
+
+    ax.axvline(0, color='black', linestyle='-', linewidth=2.5, label='Hiperplano Separador f(x) = 0')
+    ax.axvline(1, color='#2b83ba', linestyle='--', linewidth=1.8, label='Margen (+1)')
+    ax.axvline(-1, color='#d7191c', linestyle='--', linewidth=1.8, label='Margen (-1)')
+    ax.axvspan(-1, 1, color='gray', alpha=0.15, label='Zona del Margen y Vectores de Soporte [-1, +1]')
+
+    ax.set_title('Distribución de Distancias Funcionales de Estudiantes al Hiperplano SVM', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Distancia Funcional f(x) = wᵀφ(x) + b (Margen Geométrico)', fontsize=12)
+    ax.set_ylabel('Densidad de Probabilidad de Estudiantes', fontsize=12)
+    ax.legend(loc='upper right', frameon=True, facecolor='white', framealpha=0.95)
+
+    plt.tight_layout()
+
+    if output_path is None:
+        FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+        output_path = FIGURES_DIR / "svm_distancia_hiperplano_estudiantes.png"
+
+    plt.savefig(output_path, dpi=300)
+    return fig, ax
