@@ -30,27 +30,41 @@
     pdfauthor={Sara López Chavarro, Nicolás Figueroa Salgado, Arnold Santiago Torres Anzola}
 }
 
-\title{\textbf{\Large Máquinas de Soporte Vectorial para la Predicción Temprana de Deserción Estudiantil Universitaria bajo Diferentes Métodos de Normalización} \\
-\vspace{0.3cm}
-\large Machine Learning II}
-
-\author{
-    \textbf{Sara López Chavarro} \\
-    \textbf{Nicolás Figueroa Salgado} \\
-    \textbf{Arnold Santiago Torres Anzola} \\[0.4cm]
-    \small Universidad Externado de Colombia \\
-    \small Departamento de Matemáticas \\
-    \small Programa de Ciencia de Datos \\
-    \small Bogotá, 2026
-}
-
-\date{}
-
 \begin{document}
 
-\maketitle
+\begin{titlepage}
+    \hypersetup{pageanchor=false}
+    \centering
+    \vspace*{1.0cm}
+    
+    {\Large \textbf{UNIVERSIDAD EXTERNADO DE COLOMBIA}}\\[0.35cm]
+    {\large \textbf{DEPARTAMENTO DE MATEMÁTICAS}}\\[0.25cm]
+    {\large \textbf{PROGRAMA DE PREGRADO EN CIENCIA DE DATOS}}\\[2.0cm]
+    
+    \rule{\linewidth}{0.6mm}\\[0.6cm]
+    {\Large \bfseries Máquinas de Soporte Vectorial para la Predicción Temprana de Deserción Estudiantil Universitaria bajo Diferentes Métodos de Normalización}\\[0.5cm]
+    {\large \textit{Propuesta de Adaptación y Réplica Experimental con Metodología SPADIES 3.0}}\\[0.5cm]
+    \rule{\linewidth}{0.6mm}\\[1.5cm]
+    
+    {\large \textbf{Machine Learning II}}\\[2.0cm]
+    
+    \begin{minipage}{0.85\textwidth}
+        \centering
+        \textbf{\large Integrantes / Investigadores:}\\[0.4cm]
+        {\large \textbf{Sara López Chavarro}}\\[0.25cm]
+        {\large \textbf{Nicolás Figueroa Salgado}}\\[0.25cm]
+        {\large \textbf{Arnold Santiago Torres Anzola}}
+    \end{minipage}\\[2.5cm]
+    
+    \vfill
+    
+    {\large Bogotá D.C., Colombia}\\[0.2cm]
+    {\large 2026}
+\end{titlepage}
 
-\vspace{0.3cm}
+\hypersetup{pageanchor=true}
+\newpage
+\pagenumbering{arabic}
 
 \section{El problema planteado en el artículo}
 
@@ -197,23 +211,25 @@ Para validar el impacto del escalado de forma reproducible y sin fuga de datos, 
 
 \begin{table}[htbp]
 \centering
-\caption{Consolidado estadístico de 50 trials independientes sobre SVM Multiclase}
+\caption{Consolidado estadístico de 50 particiones Monte Carlo independientes sobre SVM Multiclase (SPADIES 3.0)}
 \label{tab:metricas_trials}
-\small
-\begin{tabular}{lcccccc}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccc}
 \toprule
-\textbf{Método de Normalización} & \textbf{Weighted F1} & \textbf{Macro F1} & \textbf{Desertor F1} & \textbf{Desv. Est. ($\sigma$)} & \textbf{p-valor vs. Baseline} \\
+\textbf{Método de Normalización} & \textbf{$F_1$ Ponderado} & \textbf{$F_1$ Macro} & \textbf{$F_1$ (Desertor)} & \textbf{Desv. Est. ($\sigma$)} & \textbf{$p$-valor vs. Baseline} \\
 \midrule
-\textbf{Standard Scaler} & \textbf{0.8878} & \textbf{0.8872} & \textbf{0.9015} & 0.0061 & $< 10^{-6}$ \\
-\textbf{Power Transformer} & \textbf{0.8877} & \textbf{0.8870} & \textbf{0.9016} & 0.0058 & $< 10^{-6}$ \\
-\textbf{Robust Scaler} & \textbf{0.8765} & \textbf{0.8759} & \textbf{0.8846} & 0.0060 & $< 10^{-6}$ \\
-\textbf{Min Max Scaler} & 0.8443 & 0.8431 & 0.8352 & 0.0052 & $< 10^{-6}$ \\
-\textbf{Quantile Transformer} & 0.8422 & 0.8429 & 0.8361 & 0.0060 & $< 10^{-6}$ \\
-\textbf{Max Absolute Scaler} & 0.8414 & 0.8398 & 0.8314 & 0.0054 & $< 10^{-6}$ \\
-\texttt{No Normalization (Baseline)} & 0.4792 & 0.4097 & 0.6258 & 0.0064 & Referencia \\
+\textbf{StandardScaler} & \textbf{0.8878} & \textbf{0.8872} & \textbf{0.9015} & 0.0061 & $< 10^{-6}$ \\
+\textbf{PowerTransformer} & \textbf{0.8877} & \textbf{0.8870} & \textbf{0.9016} & 0.0058 & $< 10^{-6}$ \\
+\textbf{RobustScaler} & 0.8765 & 0.8759 & 0.8846 & 0.0060 & $< 10^{-6}$ \\
+\textbf{MinMaxScaler} & 0.8443 & 0.8431 & 0.8352 & 0.0052 & $< 10^{-6}$ \\
+\textbf{QuantileTransformer} & 0.8422 & 0.8429 & 0.8361 & 0.0060 & $< 10^{-6}$ \\
+\textbf{MaxAbsScaler} & 0.8414 & 0.8398 & 0.8314 & 0.0054 & $< 10^{-6}$ \\
+\midrule
+\texttt{No Normalization (Baseline)} & 0.4792 & 0.4097 & 0.6258 & 0.0064 & Referencia ($p = 1.0$) \\
 \texttt{Ordinal Encoder} & 0.3699 & 0.3512 & 0.0000 & 0.0052 & $< 10^{-6}$ \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \subsection{Interpretación de los Resultados}
@@ -291,7 +307,7 @@ Para determinar objetivamente qué factores causan el mayor impacto en la predic
     \item \textbf{Semestre Cursado ($\Delta F_1 \approx 0.201$)}: Es el factor más influyente. La mayor vulnerabilidad se concentra en los primeros 3 semestres; a medida que el estudiante avanza en su plan de estudios, el costo de oportunidad del abandono se eleva y la deserción disminuye drásticamente.
     \item \textbf{Rendimiento Académico Temprano}: El \texttt{promedio\_academico} ($\Delta F_1 \approx 0.185$) y las \texttt{materias\_reprobadas} ($\Delta F_1 \approx 0.182$) ocupan el segundo y tercer puesto de impacto directo. La pérdida de créditos acumulados es la señal precursora inequívoca de la deserción.
     \item \textbf{Nivel de Formación ($\Delta F_1 \approx 0.081$)}: Los programas técnicos y tecnológicos exhiben dinámicas de deserción más aceleradas que las carreras universitarias tradicionales.
-    \item \textbf{Factores Socioeconómicos y Laborales}: La condición de \texttt{trabaja\_mientras\_estudia}, el \texttt{estrato\_socioeconomico} y el puntaje de ingreso \texttt{icfes} operan como factores estructurales de fondo que detonan o aceleran el bajo rendimiento académico.
+    \item \textbf{Factores Socioeconómicos y Laborales}: La condición de \texttt{trabaja\_\allowbreak mientras\_\allowbreak estudia}, el \texttt{estrato\_socioeconomico} y el puntaje de ingreso \texttt{icfes} operan como factores estructurales de fondo que detonan o aceleran el bajo rendimiento académico.
 \end{enumerate}
 
 \section{Diagnóstico de Errores y Auditoría de Equidad (Fairness)}
@@ -319,7 +335,7 @@ Para garantizar que el modelo no discrimine en función de condiciones demográf
 \centering
 \caption{Auditoría de Equidad (Fairness): Desglose del Recall de deserción por subgrupo}
 \label{tab:subgrupos}
-\small
+\resizebox{0.92\textwidth}{!}{%
 \begin{tabular}{llcc}
 \toprule
 \textbf{Variable de Control} & \textbf{Subgrupo Poblacional} & \textbf{Desertores en Test} & \textbf{Recall (Desertor)} \\
@@ -337,7 +353,8 @@ Para garantizar que el modelo no discrimine en función de condiciones demográf
 \texttt{metodologia} & Virtual & 88 & 90.91\% \\
 \texttt{metodologia} & Distancia tradicional & 110 & 90.00\% \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \textbf{Hallazgo de Equidad}: La variación del Recall entre subgrupos es inferior a 4 puntos porcentuales en todas las dimensiones evaluadas (por ejemplo, $91.97\%$ en hombres vs. $92.25\%$ en mujeres; $93.38\%$ en zonas rurales vs. $91.84\%$ en urbanas). Esto certifica que el modelo es robusto, imparcial y adecuado para operar de forma transparente en políticas de permanencia institucional.
