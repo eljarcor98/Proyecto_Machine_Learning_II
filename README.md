@@ -2,7 +2,7 @@
 
 Proyecto de investigación para **Machine Learning II (2026-II)** enfocado en predecir la deserción universitaria mediante **Máquinas de Soporte Vectorial (SVM)**, evaluando el impacto de diferentes técnicas de normalización sobre el rendimiento del clasificador.
 
-📄 **[Artículo Científico Principal (PDF)](Maquinas_de_Soporte_Vectorial_para_la_Prediccion_Temprana_de_Desercion_Estudiantil_Universitaria.pdf)**
+📄 **[Artículo Científico Principal (PDF)](Maquinas_de_Soporte_Vectorial_para_la_Prediccion_Temprana_de_Desercion_Estudiantil_Universitaria.pdf?raw=true)**
 
 ---
 
