@@ -1,384 +1,603 @@
 """
-Módulo de Evaluación de Modelos, Experimentos Paralelos y Serialización.
-========================================================================
-Gestiona la ejecución de experimentos Monte Carlo multiclase para evaluación de métodos
-de normalización, la estimación de importancia de variables por permutación y la
-serialización/deserialización de modelos entrenados con joblib.
+Módulo de Evaluación de Modelos, Experimentos Monte Carlo y Serialización.
+============================================================================
 
-Principales Capacidades:
-------------------------
-1. _evaluate_single_trial: Evaluación de una partición independiente para los 8 escaladores.
-2. run_multiclass_trials: Orquestador paralelizado (con joblib) de N repeticiones sin fuga de datos.
-3. fit_best_pipeline: Ajuste final del pipeline óptimo sobre la partición de entrenamiento.
-4. save_model / load_model: Persistencia y carga segura de artefactos serializados (.joblib).
-5. compute_permutation_importance: Estimación no paramétrica de relevancia de características.
+Incluye:
+1. Evaluación repetida de ocho configuraciones SVM.
+2. Comparación de kernels RBF y polinomial.
+3. DummyClassifier como baseline predictiva independiente.
+4. Selección de normalizador mediante F1 Macro.
+5. Entrenamiento final y serialización.
+6. Importancia de variables por permutación.
 
-Autor: Arnold Santiago Torres
-Machine Learning II - 2026-II
+El conjunto de test final debe permanecer fuera de este módulo durante
+la selección experimental.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed, dump, load
-from sklearn.inspection import permutation_importance
-from sklearn.metrics import f1_score
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 
-from src.models.pipeline import build_svm_pipeline, get_normalization_scalers
-from src.utils.config import (
-    CAT_COLS,
-    CLASS_MAP,
-    DEFAULT_MODEL_FILE,
-    MODELS_DIR,
-    NUM_COLS
+from joblib import Parallel, delayed, dump, load
+
+from sklearn.dummy import DummyClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import f1_score
+from sklearn.inspection import permutation_importance
+
+from src.models.pipeline import (
+    build_svm_pipeline,
+    get_normalization_scalers
 )
+
+from src.utils.config import (
+    CLASSES,
+    NUM_COLS,
+    CAT_COLS
+)
+
 from src.utils.metrics import build_summary_comparison_table
 
 
-def _evaluate_single_trial(
-    X_raw: pd.DataFrame,
-    y: np.ndarray,
-    trial_idx: int,
-    scalers_dict: Dict[str, Any],
-    num_cols: List[str],
-    cat_cols: List[str],
-    class_map: Dict[str, int],
-    test_size: float = 0.2
-) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float]]:
-    """
-    Función de trabajo atómica para paralelización: evalúa una partición independiente (trial)
-    entrenando un pipeline independiente para cada uno de los escaladores provistos.
+# =============================================================================
+# CONSTANTES
+# =============================================================================
 
-    Parámetros:
-    -----------
-    X_raw : pd.DataFrame
-        Matriz completa de características (sin dividir).
-    y : np.ndarray
-        Vector completo de etiquetas de clase.
-    trial_idx : int
-        Índice del ensayo actual (utilizado como offset de la semilla pseudoaleatoria).
-    scalers_dict : dict de {str: scaler_instance}
-        Diccionario con los estimadores de normalización a evaluar.
-    num_cols : list of str
-        Variables numéricas.
-    cat_cols : list of str
-        Variables categóricas.
-    class_map : dict de {str: int}
-        Mapeo de etiquetas textuales a índices enteros.
-    test_size : float, por defecto 0.2
-        Proporción reservada para el conjunto de prueba de la iteración.
+DUMMY_NAME = "DummyClassifier (Most Frequent)"
+SVM_BASELINE_NAME = "No Normalization (Baseline)"
 
-    Retorna:
-    --------
-    tuple:
-        (trial_scores_weighted, trial_scores_macro, trial_scores_desertor)
+
+# =============================================================================
+# FUNCIONES AUXILIARES
+# =============================================================================
+
+def _get_scaler_information(scaler_name, scaler_info):
     """
-    # Generar partición estratificada única para esta iteración (Monte Carlo Cross-Validation)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_raw,
-        y,
-        test_size=test_size,
-        random_state=42 + trial_idx,
-        stratify=y
+    Obtiene el transformador y determina si la configuración es ordinal.
+
+    Compatible con:
+    - Transformadores sklearn devueltos directamente.
+    - Diccionarios con las claves 'scaler' e 'is_ordinal'.
+    """
+
+    if isinstance(scaler_info, dict):
+        scaler = scaler_info.get("scaler")
+        is_ordinal = scaler_info.get(
+            "is_ordinal",
+            scaler_name.lower().startswith("ordinal")
+        )
+    else:
+        scaler = scaler_info
+        is_ordinal = scaler_name.lower().startswith("ordinal")
+
+    return scaler, is_ordinal
+
+
+def _calculate_trial_metrics(y_true, y_pred):
+    """
+    Calcula las tres métricas utilizadas durante los experimentos.
+    """
+
+    return (
+        f1_score(
+            y_true,
+            y_pred,
+            average="weighted",
+            zero_division=0
+        ),
+        f1_score(
+            y_true,
+            y_pred,
+            average="macro",
+            zero_division=0
+        ),
+        f1_score(
+            y_true,
+            y_pred,
+            labels=["Desertor"],
+            average="macro",
+            zero_division=0
+        )
     )
 
-    trial_scores_weighted = {}
-    trial_scores_macro = {}
-    trial_scores_desertor = {}
 
-    idx_des = class_map['Desertor']
+# =============================================================================
+# 1. EVALUACIÓN DE UN TRIAL
+# =============================================================================
 
-    # Iterar sobre cada técnica de normalización dentro de la partición actual
-    for method_name, scaler_proto in scalers_dict.items():
-        try:
-            # Identificar si corresponde a la variante ordinal
-            is_ordinal = (method_name == 'Ordinal Encoder')
+def _evaluate_single_trial(
+    X_dev,
+    y_dev,
+    trial_idx,
+    scalers_dict,
+    num_cols,
+    cat_cols,
+    test_size=0.2,
+    kernel="rbf",
+    degree=3,
+    coef0=1.0
+):
+    """
+    Ejecuta una partición estratificada y evalúa:
 
-            # Ensamblar pipeline exclusivo para esta partición
-            pipeline = build_svm_pipeline(
-                scaler=scaler_proto,
-                num_cols=num_cols,
-                cat_cols=cat_cols,
-                is_ordinal=is_ordinal,
-                random_state=42
-            )
+    - Las ocho configuraciones SVM.
+    - DummyClassifier con estrategia most_frequent.
 
-            # Ajuste estricto sobre X_train (evita fuga de datos)
-            pipeline.fit(X_train, y_train)
+    Todos los modelos utilizan exactamente la misma partición.
+    """
 
-            # Inferencia sobre datos nunca antes vistos (X_test)
-            preds = pipeline.predict(X_test)
+    y_dev = pd.Series(y_dev).reset_index(drop=True)
 
-            # Cálculo de métricas de desempeño
-            trial_scores_weighted[method_name] = float(f1_score(y_test, preds, average='weighted'))
-            trial_scores_macro[method_name] = float(f1_score(y_test, preds, average='macro'))
-            trial_scores_desertor[method_name] = float(f1_score(y_test, preds, labels=[idx_des], average='macro'))
+    if y_dev.isna().any():
+        raise ValueError("y_dev contiene valores nulos.")
 
-        except Exception:
-            # Captura de fallas numéricas en transformaciones extremas
-            trial_scores_weighted[method_name] = np.nan
-            trial_scores_macro[method_name] = np.nan
-            trial_scores_desertor[method_name] = np.nan
+    y_dev = y_dev.astype(str)
 
-    return trial_scores_weighted, trial_scores_macro, trial_scores_desertor
+    X_dev = X_dev.reset_index(drop=True)
 
+    X_train, X_valid, y_train, y_valid = train_test_split(
+        X_dev,
+        y_dev,
+        test_size=test_size,
+        random_state=42 + trial_idx,
+        stratify=y_dev
+    )
+
+    results_weighted = {}
+    results_macro = {}
+    results_desertor = {}
+
+    # -------------------------------------------------------------------------
+    # SVM: configuraciones de normalización
+    # -------------------------------------------------------------------------
+
+    for scaler_name, scaler_info in scalers_dict.items():
+
+        scaler, is_ordinal = _get_scaler_information(
+            scaler_name,
+            scaler_info
+        )
+
+        model = build_svm_pipeline(
+            scaler=scaler,
+            num_cols=num_cols,
+            cat_cols=cat_cols,
+            kernel=kernel,
+            degree=degree,
+            coef0=coef0,
+            probability=False,
+            random_state=42 + trial_idx,
+            is_ordinal=is_ordinal
+        )
+
+        model.fit(X_train, y_train)
+
+        predictions = model.predict(X_valid)
+
+        (
+            score_weighted,
+            score_macro,
+            score_desertor
+        ) = _calculate_trial_metrics(
+            y_valid,
+            predictions
+        )
+
+        results_weighted[scaler_name] = score_weighted
+        results_macro[scaler_name] = score_macro
+        results_desertor[scaler_name] = score_desertor
+
+    # -------------------------------------------------------------------------
+    # DummyClassifier: baseline predictiva independiente
+    # -------------------------------------------------------------------------
+
+    dummy = DummyClassifier(
+        strategy="most_frequent"
+    )
+
+    dummy.fit(X_train, y_train)
+
+    dummy_predictions = dummy.predict(X_valid)
+
+    (
+        dummy_weighted,
+        dummy_macro,
+        dummy_desertor
+    ) = _calculate_trial_metrics(
+        y_valid,
+        dummy_predictions
+    )
+
+    results_weighted[DUMMY_NAME] = dummy_weighted
+    results_macro[DUMMY_NAME] = dummy_macro
+    results_desertor[DUMMY_NAME] = dummy_desertor
+
+    return (
+        results_weighted,
+        results_macro,
+        results_desertor
+    )
+
+
+# =============================================================================
+# 2. EXPERIMENTOS MONTE CARLO
+# =============================================================================
 
 def run_multiclass_trials(
-    X_raw: pd.DataFrame,
-    y: np.ndarray,
-    n_trials: int = 50,
-    n_jobs: int = -1,
-    scalers_dict: Optional[Dict[str, Any]] = None,
-    num_cols: Optional[List[str]] = None,
-    cat_cols: Optional[List[str]] = None,
-    class_map: Optional[Dict[str, int]] = None,
-    test_size: float = 0.2
-) -> Tuple[Dict[str, List[float]], Dict[str, List[float]], Dict[str, List[float]], pd.DataFrame]:
+    X_dev,
+    y_dev,
+    n_trials=50,
+    n_jobs=-1,
+    scalers_dict=None,
+    num_cols=None,
+    cat_cols=None,
+    test_size=0.2,
+    kernel="rbf",
+    degree=3,
+    coef0=1.0
+):
     """
-    Ejecuta el experimento de N particiones independientes en paralelo utilizando joblib.
-    Consolida las métricas de todas las iteraciones y construye la tabla comparativa con significancia t-test.
-
-    Parámetros:
-    -----------
-    X_raw : pd.DataFrame
-        Matriz de características predictoras.
-    y : np.ndarray
-        Vector de etiquetas verdaderas.
-    n_trials : int, por defecto 50
-        Número de iteraciones independientes de validación cruzada Monte Carlo.
-    n_jobs : int, por defecto -1
-        Número de núcleos de CPU para ejecución concurrente (-1 utiliza todos los disponibles).
-    scalers_dict : dict, opcional
-        Catálogo de escaladores a evaluar. Por defecto get_normalization_scalers().
-    num_cols : list of str, opcional
-        Variables continuas y discretas numéricas.
-    cat_cols : list of str, opcional
-        Variables cualitativas categóricas.
-    class_map : dict, opcional
-        Mapeo de nombres a enteros.
-    test_size : float, por defecto 0.2
-        Fracción destinada a prueba en cada iteración.
+    Ejecuta experimentos Monte Carlo para las ocho configuraciones SVM
+    y DummyClassifier.
 
     Retorna:
-    --------
-    tuple:
-        (results_weighted, results_macro, results_desertor, summary_df)
+        results_weighted
+        results_macro
+        results_desertor
+        summary_df
     """
+
     if scalers_dict is None:
         scalers_dict = get_normalization_scalers()
+
     if num_cols is None:
         num_cols = NUM_COLS
+
     if cat_cols is None:
         cat_cols = CAT_COLS
-    if class_map is None:
-        class_map = CLASS_MAP
 
-    # Despachar las N iteraciones a través del pool de procesos de joblib
-    parallel_results = Parallel(n_jobs=n_jobs)(
+    if not isinstance(X_dev, pd.DataFrame):
+        raise TypeError("X_dev debe ser un DataFrame.")
+
+    if len(X_dev) != len(y_dev):
+        raise ValueError(
+            "X_dev e y_dev tienen diferente número de registros."
+        )
+
+    if n_trials < 2:
+        raise ValueError("n_trials debe ser al menos 2.")
+
+    if not 0 < test_size < 1:
+        raise ValueError("test_size debe estar entre 0 y 1.")
+
+    if not isinstance(scalers_dict, dict) or not scalers_dict:
+        raise ValueError(
+            "scalers_dict debe ser un diccionario no vacío."
+        )
+
+    if SVM_BASELINE_NAME not in scalers_dict:
+        raise ValueError(
+            f"Falta la configuración obligatoria: {SVM_BASELINE_NAME}"
+        )
+
+    y_dev = pd.Series(y_dev).reset_index(drop=True)
+
+    if y_dev.isna().any():
+        raise ValueError("y_dev contiene valores nulos.")
+
+    y_dev = y_dev.astype(str)
+
+    if set(y_dev.unique()) != set(CLASSES):
+        raise ValueError(
+            "El conjunto de desarrollo debe contener las tres clases: "
+            f"{CLASSES}"
+        )
+
+    if len(y_dev) != len(X_dev):
+        raise ValueError(
+            "X_dev e y_dev tienen diferente número de registros."
+        )
+
+    print(
+        f"\nEjecutando {n_trials} trials para kernel {kernel.upper()}..."
+    )
+
+    trial_results = Parallel(
+        n_jobs=n_jobs,
+        verbose=5
+    )(
         delayed(_evaluate_single_trial)(
-            X_raw=X_raw,
-            y=y,
-            trial_idx=t,
+            X_dev=X_dev,
+            y_dev=y_dev,
+            trial_idx=trial_idx,
             scalers_dict=scalers_dict,
             num_cols=num_cols,
             cat_cols=cat_cols,
-            class_map=class_map,
-            test_size=test_size
+            test_size=test_size,
+            kernel=kernel,
+            degree=degree,
+            coef0=coef0
         )
-        for t in range(n_trials)
+        for trial_idx in range(n_trials)
     )
 
-    # Inicializar contenedores de recolección de resultados por técnica
-    results_weighted = {method: [] for method in scalers_dict.keys()}
-    results_macro = {method: [] for method in scalers_dict.keys()}
-    results_desertor = {method: [] for method in scalers_dict.keys()}
+    if not trial_results:
+        raise RuntimeError(
+            "No se obtuvieron resultados de los experimentos."
+        )
 
-    # Acumular las métricas devueltas por cada proceso concurrente
-    for res_wei, res_mac, res_des in parallel_results:
-        for method_name in scalers_dict.keys():
-            results_weighted[method_name].append(res_wei[method_name])
-            results_macro[method_name].append(res_mac[method_name])
-            results_desertor[method_name].append(res_des[method_name])
+    results_weighted = {
+        name: [trial[0][name] for trial in trial_results]
+        for name in trial_results[0][0]
+    }
 
-    # Construir tabla estadística con t-test vs Baseline
+    results_macro = {
+        name: [trial[1][name] for trial in trial_results]
+        for name in trial_results[0][1]
+    }
+
+    results_desertor = {
+        name: [trial[2][name] for trial in trial_results]
+        for name in trial_results[0][2]
+    }
+
     summary_df = build_summary_comparison_table(
         results_weighted=results_weighted,
         results_macro=results_macro,
         results_desertor=results_desertor,
-        baseline_name='No Normalization (Baseline)'
+        baseline_name=SVM_BASELINE_NAME
     )
 
-    return results_weighted, results_macro, results_desertor, summary_df
+    print(
+        f"-> Finalizados {n_trials} trials para {kernel.upper()}."
+    )
 
+    return (
+        results_weighted,
+        results_macro,
+        results_desertor,
+        summary_df
+    )
+
+
+# =============================================================================
+# 3. SELECCIÓN DE LA MEJOR CONFIGURACIÓN SVM
+# =============================================================================
+
+def select_best_configuration(
+    results_macro,
+    scalers_dict
+):
+    """
+    Selecciona exclusivamente entre las configuraciones SVM.
+
+    DummyClassifier queda excluido porque no es un normalizador
+    ni una configuración SVM.
+    """
+
+    svm_names = [
+        name
+        for name in scalers_dict
+        if name in results_macro
+    ]
+
+    if not svm_names:
+        raise ValueError(
+            "No hay configuraciones SVM disponibles para seleccionar."
+        )
+
+    mean_scores = {}
+
+    for name in svm_names:
+
+        scores = np.asarray(
+            results_macro[name],
+            dtype=float
+        )
+
+        if scores.size == 0 or np.isnan(scores).all():
+            raise ValueError(
+                f"No existen puntuaciones válidas para {name}."
+            )
+
+        mean_scores[name] = float(np.nanmean(scores))
+
+    best_name = max(
+        mean_scores,
+        key=mean_scores.get
+    )
+
+    best_info = scalers_dict[best_name]
+
+    best_scaler, best_ordinal = _get_scaler_information(
+        best_name,
+        best_info
+    )
+
+    return (
+        best_name,
+        best_scaler,
+        best_ordinal
+    )
+
+
+# =============================================================================
+# 4. ENTRENAMIENTO FINAL SVM
+# =============================================================================
 
 def fit_best_pipeline(
-    X_train: pd.DataFrame,
-    y_train: np.ndarray,
-    scaler: Any = None,
-    num_cols: Optional[List[str]] = None,
-    cat_cols: Optional[List[str]] = None,
-    probability: bool = False,
-    random_state: int = 42
-) -> Pipeline:
+    X_train,
+    y_train,
+    scaler=None,
+    num_cols=None,
+    cat_cols=None,
+    kernel="rbf",
+    degree=3,
+    coef0=1.0,
+    probability=False,
+    random_state=42,
+    is_ordinal=False
+):
     """
-    Ajusta el pipeline óptimo sobre la partición completa de entrenamiento.
-
-    Parámetros:
-    -----------
-    X_train : pd.DataFrame
-        Matriz de características de entrenamiento.
-    y_train : np.ndarray
-        Vector de etiquetas de entrenamiento.
-    scaler : Any, opcional
-        Método de escalamiento seleccionado. Por defecto StandardScaler().
-    num_cols : list of str, opcional
-        Variables numéricas.
-    cat_cols : list of str, opcional
-        Variables categóricas.
-    probability : bool, por defecto False
-        Habilitar estimación probabilística de Platt.
-    random_state : int, por defecto 42
-        Semilla aleatoria.
-
-    Retorna:
-    --------
-    Pipeline:
-        Pipeline ajustado y listo para inferencia o persistencia en disco.
+    Entrena el pipeline SVM seleccionado utilizando todo el conjunto
+    de desarrollo.
     """
+
+    if num_cols is None:
+        num_cols = NUM_COLS
+
+    if cat_cols is None:
+        cat_cols = CAT_COLS
+
     if scaler is None:
-        scaler = StandardScaler()
+        raise ValueError(
+            "Debe proporcionarse el normalizador seleccionado."
+        )
 
-    # Construir pipeline con preprocesador y clasificador
-    pipeline = build_svm_pipeline(
+    if len(X_train) != len(y_train):
+        raise ValueError(
+            "X_train e y_train tienen diferente número de registros."
+        )
+
+    model = build_svm_pipeline(
         scaler=scaler,
         num_cols=num_cols,
         cat_cols=cat_cols,
+        kernel=kernel,
+        degree=degree,
+        coef0=coef0,
         probability=probability,
-        random_state=random_state
+        random_state=random_state,
+        is_ordinal=is_ordinal
     )
 
-    # Ajustar pipeline sobre los datos de entrenamiento
-    pipeline.fit(X_train, y_train)
-    return pipeline
+    model.fit(
+        X_train,
+        pd.Series(y_train).astype(str)
+    )
 
+    return model
+
+
+# =============================================================================
+# 5. ENTRENAMIENTO FINAL DUMMY
+# =============================================================================
+
+def fit_dummy_classifier(
+    X_train,
+    y_train,
+    strategy="most_frequent"
+):
+    """
+    Entrena el baseline predictivo DummyClassifier.
+
+    No utiliza las características para aprender relaciones predictivas.
+    La estrategia most_frequent predice siempre la clase mayoritaria
+    observada en el conjunto de entrenamiento.
+    """
+
+    if len(X_train) != len(y_train):
+        raise ValueError(
+            "X_train e y_train tienen diferente número de registros."
+        )
+
+    model = DummyClassifier(
+        strategy=strategy
+    )
+
+    model.fit(
+        X_train,
+        pd.Series(y_train).astype(str)
+    )
+
+    return model
+
+
+# =============================================================================
+# 6. SERIALIZACIÓN
+# =============================================================================
 
 def save_model(
-    pipeline: Pipeline,
-    filepath: Optional[Union[str, Path]] = None
-) -> Path:
-    """
-    Serializa el pipeline ajustado en disco utilizando joblib.
+    model,
+    filepath
+):
+    """Guarda un modelo utilizando joblib."""
 
-    Parámetros:
-    -----------
-    pipeline : Pipeline
-        Pipeline ajustado de Scikit-Learn.
-    filepath : str o Path, opcional
-        Ruta destino para guardar el artefacto (.joblib). Por defecto DEFAULT_MODEL_FILE.
+    filepath = Path(filepath)
 
-    Retorna:
-    --------
-    Path:
-        Ruta absoluta del archivo guardado.
-    """
-    if filepath is None:
-        MODELS_DIR.mkdir(parents=True, exist_ok=True)
-        target_path = DEFAULT_MODEL_FILE
-    else:
-        target_path = Path(filepath)
-        target_path.parent.mkdir(parents=True, exist_ok=True)
+    filepath.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-    dump(pipeline, target_path)
-    return target_path
+    dump(model, filepath)
+
+    return filepath
 
 
-def load_model(filepath: Optional[Union[str, Path]] = None) -> Pipeline:
-    """
-    Carga un pipeline previamente serializado desde el disco.
+def load_model(filepath):
+    """Carga un modelo previamente serializado."""
 
-    Parámetros:
-    -----------
-    filepath : str o Path, opcional
-        Ruta del archivo .joblib a cargar. Por defecto DEFAULT_MODEL_FILE.
+    filepath = Path(filepath)
 
-    Retorna:
-    --------
-    Pipeline:
-        Pipeline deserializado listo para predicciones.
+    if not filepath.exists():
+        raise FileNotFoundError(
+            f"No se encontró el modelo: {filepath}"
+        )
 
-    Lanza:
-    ------
-    FileNotFoundError:
-        Si el archivo no existe en la ruta especificada.
-    """
-    if filepath is None:
-        target_path = DEFAULT_MODEL_FILE
-    else:
-        target_path = Path(filepath)
+    return load(filepath)
 
-    if not target_path.exists():
-        raise FileNotFoundError(f"No existe el archivo de modelo serializado en: {target_path}")
 
-    return load(target_path)
-
+# =============================================================================
+# 7. IMPORTANCIA POR PERMUTACIÓN
+# =============================================================================
 
 def compute_permutation_importance(
-    pipeline: Pipeline,
-    X_test: pd.DataFrame,
-    y_test: np.ndarray,
-    n_repeats: int = 5,
-    random_state: int = 42,
-    n_jobs: int = -1
-) -> pd.DataFrame:
+    model,
+    X_test,
+    y_test,
+    n_repeats=20,
+    random_state=42,
+    n_jobs=-1
+):
     """
-    Calcula la Importancia de Variables por Permutación (Permutation Feature Importance).
-    Metodología no paramétrica que permuta aleatoriamente los valores de cada variable
-    en el conjunto de prueba y cuantifica la caída resultante en el rendimiento (F1-Score).
+    Calcula importancia por permutación usando F1 Macro.
 
-    Parámetros:
-    -----------
-    pipeline : Pipeline
-        Pipeline ajustado a evaluar.
-    X_test : pd.DataFrame
-        Matriz de características de prueba.
-    y_test : np.ndarray
-        Vector de etiquetas verdaderas de prueba.
-    n_repeats : int, por defecto 5
-        Número de veces que se baraja cada variable para estimar la varianza de la métrica.
-    random_state : int, por defecto 42
-        Semilla para el generador de permutaciones.
-    n_jobs : int, por defecto -1
-        Núcleos paralelos para el cómputo de permutaciones.
-
-    Retorna:
-    --------
-    pd.DataFrame:
-        DataFrame con las variables ordenadas descendentemente por importancia media ('Importance_Mean')
-        junto con su desviación estándar ('Importance_Std').
+    Este análisis es posterior a la evaluación y no debe utilizarse
+    para seleccionar o reajustar el modelo.
     """
-    # Ejecutar la inspección de permutaciones de Scikit-Learn
-    perm_importance = permutation_importance(
-        pipeline,
-        X_test,
-        y_test,
+
+    if n_repeats < 1:
+        raise ValueError("n_repeats debe ser al menos 1.")
+
+    if not isinstance(X_test, pd.DataFrame):
+        raise TypeError("X_test debe ser un DataFrame.")
+
+    if len(X_test) != len(y_test):
+        raise ValueError(
+            "X_test e y_test tienen diferente número de registros."
+        )
+
+    result = permutation_importance(
+        estimator=model,
+        X=X_test,
+        y=y_test,
+        scoring="f1_macro",
         n_repeats=n_repeats,
         random_state=random_state,
         n_jobs=n_jobs
     )
 
-    # Ordenar índices de mayor a menor impacto en el clasificador
-    sorted_idx = perm_importance.importances_mean.argsort()[::-1]
-    feature_names = X_test.columns
-
-    # Estructurar resultados en DataFrame ordenado
-    imp_df = pd.DataFrame({
-        'Feature': feature_names[sorted_idx],
-        'Importance_Mean': perm_importance.importances_mean[sorted_idx],
-        'Importance_Std': perm_importance.importances_std[sorted_idx]
+    importance_df = pd.DataFrame({
+        "Feature": X_test.columns,
+        "Importance Mean": result.importances_mean,
+        "Importance Std": result.importances_std
     })
 
-    return imp_df.reset_index(drop=True)
+    importance_df = importance_df.sort_values(
+        by="Importance Mean",
+        ascending=False
+    ).reset_index(drop=True)
+
+    return importance_df

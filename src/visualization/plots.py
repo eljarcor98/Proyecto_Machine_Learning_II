@@ -1,33 +1,56 @@
+
 """
 Módulo de Visualización Científica del Experimento SVM.
 ======================================================
-Provee funciones especializadas de graficación para la generación de evidencias empíricas
-y figuras de publicación en alta resolución (300 DPI):
 
-Figuras Soportadas:
--------------------
-1. plot_eda_distributions: Distribución SPADIES 3 clases + Correlaciones Pearson vs Spearman.
-2. plot_key_variables_distribution: Boxplots de variables clave (Promedio y Reprobadas) por estado.
-3. plot_scaler_impact: Demostración empírica de 6 transformaciones sobre variable sesgada.
-4. plot_normalization_comparison: Gráfico de barras comparativo de normalizaciones vs baseline.
-5. plot_permutation_importance: Relevancia de características por permutación con barras de error.
-6. plot_pca_hyperplane: Fronteras de decisión RBF y vectores de soporte en espacio latente PCA 2D.
-7. plot_confusion_matrices: Matriz de confusión multiclase 3x3 (conteos absolutos y normalizada).
+Genera figuras exploratorias y de evaluación para el experimento
+de clasificación multiclase del estado académico estudiantil.
 
-Autor: Arnold Santiago Torres
+Proyecto:
 Machine Learning II - 2026-II
+
+Clases:
+- Graduado
+- En curso
+- Desertor
+
+Figuras:
+1.  plot_eda_distributions
+2.  plot_key_variables_distribution
+3.  plot_scaler_impact
+4.  plot_normalization_comparison
+5.  plot_permutation_importance
+6.  plot_pca_hyperplane
+7.  plot_confusion_matrices
+8.  plot_decision_boundary_top2
+9.  plot_decision_function_distribution
+10. plot_classification_metrics
+11. plot_trial_score_distributions
+12. plot_desertor_metrics
+
+Consideraciones:
+- El conjunto de datos es sintético e inspirado en el contexto SPADIES.
+- Las visualizaciones descriptivas no demuestran causalidad.
+- Los gráficos binarios son experimentos exploratorios independientes.
+- PCA es una proyección visual, no una frontera real del SVM.
+- Las puntuaciones de decisión no son distancias geométricas.
 """
 
 from pathlib import Path
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
+
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+
 from sklearn.decomposition import PCA
-from sklearn.metrics import confusion_matrix
-from sklearn.pipeline import Pipeline
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import (
+    MaxAbsScaler,
     MinMaxScaler,
     PowerTransformer,
     QuantileTransformer,
@@ -44,348 +67,1203 @@ from src.utils.config import (
     SCATTER_PALETTE
 )
 
-# Configuración estética base para gráficos científicos
-sns.set_theme(style='whitegrid', font_scale=1.1)
-plt.rcParams['font.sans-serif'] = 'Arial'
 
+# ============================================================
+# CONFIGURACIÓN GENERAL
+# ============================================================
+
+sns.set_theme(
+    style="whitegrid",
+    font_scale=1.0
+)
+
+plt.rcParams.update({
+    "font.family": "DejaVu Sans",
+    "figure.dpi": 100,
+    "savefig.dpi": 300,
+    "axes.titlesize": 12,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "legend.fontsize": 9,
+    "figure.facecolor": "white",
+    "axes.facecolor": "white"
+})
+
+
+# ============================================================
+# FUNCIONES AUXILIARES
+# ============================================================
+
+def _prepare_output_path(
+    output_path: Optional[Union[str, Path]],
+    filename: str
+) -> Path:
+    """
+    Prepara la ruta de salida y crea los directorios necesarios.
+
+    Si output_path es None, utiliza FIGURES_DIR.
+    """
+
+    if output_path is None:
+        FIGURES_DIR.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+        path = FIGURES_DIR / filename
+
+    else:
+        path = Path(output_path)
+        path.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+    return path
+
+
+def _save_figure(
+    fig: plt.Figure,
+    output_path: Optional[Union[str, Path]],
+    filename: str
+) -> Path:
+    """
+    Guarda una figura en alta resolución.
+
+    Devuelve la ruta donde fue almacenada.
+    No cierra la figura para permitir modificaciones posteriores.
+    """
+
+    path = _prepare_output_path(
+        output_path,
+        filename
+    )
+
+    fig.savefig(
+        path,
+        dpi=300,
+        bbox_inches="tight",
+        facecolor="white",
+        edgecolor="none"
+    )
+
+    return path
+
+
+def _validate_dataframe(
+    df: pd.DataFrame,
+    required_columns: Sequence[str]
+) -> None:
+    """
+    Valida el tipo de objeto y la presencia de columnas.
+    """
+
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(
+            "Se esperaba un objeto pandas.DataFrame."
+        )
+
+    missing = [
+        col for col in required_columns
+        if col not in df.columns
+    ]
+
+    if missing:
+        raise ValueError(
+            f"Faltan columnas requeridas: {missing}"
+        )
+
+
+def _validate_target(
+    df: pd.DataFrame,
+    classes: Optional[List[str]] = None
+) -> List[str]:
+    """
+    Valida la variable objetivo textual estado_final.
+    """
+
+    _validate_dataframe(
+        df,
+        ["estado_final"]
+    )
+
+    if classes is None:
+        classes = list(CLASSES)
+
+    observed = set(
+        df["estado_final"].dropna().unique()
+    )
+
+    unknown = observed - set(classes)
+
+    if unknown:
+        raise ValueError(
+            f"Se encontraron clases no reconocidas: {unknown}"
+        )
+
+    if len(observed) < 2:
+        raise ValueError(
+            "Se necesitan al menos dos clases observadas."
+        )
+
+    return list(classes)
+
+
+def _get_class_color(
+    label: str,
+    index: int = 0
+) -> str:
+    """
+    Obtiene el color asociado a una clase.
+    """
+
+    if isinstance(CLASS_PALETTE, dict):
+        if label in CLASS_PALETTE:
+            return CLASS_PALETTE[label]
+
+    if SCATTER_PALETTE:
+        return SCATTER_PALETTE[
+            index % len(SCATTER_PALETTE)
+        ]
+
+    return "steelblue"
+
+
+def _to_dense(X: Any) -> np.ndarray:
+    """
+    Convierte matrices dispersas en matrices densas.
+    """
+
+    if hasattr(X, "toarray"):
+        X = X.toarray()
+
+    return np.asarray(X)
+
+
+def _validate_numeric_columns(
+    df: pd.DataFrame,
+    columns: Sequence[str]
+) -> List[str]:
+    """
+    Conserva columnas numéricas disponibles y no constantes.
+    """
+
+    valid = []
+
+    for col in columns:
+
+        if col not in df.columns:
+            continue
+
+        series = pd.to_numeric(
+            df[col],
+            errors="coerce"
+        )
+
+        if series.notna().sum() == 0:
+            continue
+
+        if series.nunique(dropna=True) <= 1:
+            continue
+
+        valid.append(col)
+
+    if not valid:
+        raise ValueError(
+            "No existen variables numéricas válidas."
+        )
+
+    return valid
+
+
+def _validate_sample_size(
+    sample_size: int,
+    minimum: int = 2
+) -> None:
+    """
+    Valida el tamaño de muestra.
+    """
+
+    if not isinstance(sample_size, int) or sample_size < minimum:
+        raise ValueError(
+            f"sample_size debe ser un entero >= {minimum}."
+        )
+
+
+def _get_svm_from_pipeline(pipeline) -> SVC:
+    """
+    Localiza el estimador SVC dentro del pipeline entrenado.
+    """
+
+    if not hasattr(pipeline, "named_steps"):
+        raise TypeError(
+            "Se esperaba un sklearn Pipeline entrenado."
+        )
+
+    svm_models = [
+        step
+        for step in pipeline.named_steps.values()
+        if isinstance(step, SVC)
+    ]
+
+    if not svm_models:
+        raise ValueError(
+            "No se encontró un estimador SVC dentro del pipeline."
+        )
+
+    svm_model = svm_models[-1]
+
+    if not hasattr(svm_model, "support_vectors_"):
+        raise ValueError(
+            "El SVM todavía no está entrenado."
+        )
+
+    return svm_model
+
+
+# ============================================================
+# 1. DISTRIBUCIÓN DE CLASES Y CORRELACIONES
+# ============================================================
 
 def plot_eda_distributions(
     df: pd.DataFrame,
     num_cols: Optional[List[str]] = None,
     classes: Optional[List[str]] = None,
     output_path: Optional[Union[str, Path]] = None
-) -> Tuple[plt.Figure, Any]:
+):
     """
-    Figura 1: Genera un panel de 3 gráficos para el análisis exploratorio:
-    - Subgráfico 1: Conteo absoluto y porcentual de las 3 clases SPADIES.
-    - Subgráfico 2: Correlación lineal de Pearson de variables numéricas con la deserción.
-    - Subgráfico 3: Correlación monótona de Spearman con la deserción.
+    Distribución de clases y correlaciones Pearson/Spearman.
 
-    Parámetros:
-    -----------
-    df : pd.DataFrame
-        DataFrame con las columnas del dataset y la variable objetivo 'estado_final'.
-    num_cols : list of str, opcional
-        Lista de variables continuas y discretas a evaluar. Por defecto NUM_COLS.
-    classes : list of str, opcional
-        Nombres y orden de las clases a graficar. Por defecto CLASSES.
-    output_path : str o Path, opcional
-        Ruta para guardar la imagen generada (300 DPI). Si es None, usa FIGURES_DIR.
+    Las correlaciones se calculan respecto a la variable binaria:
+    Desertor frente al resto.
 
-    Retorna:
-    --------
-    tuple:
-        (fig, axes) objetos de Matplotlib.
+    Son asociaciones descriptivas y no implican causalidad.
     """
+
+    classes = _validate_target(
+        df,
+        classes
+    )
+
     if num_cols is None:
         num_cols = NUM_COLS
-    if classes is None:
-        classes = CLASSES
 
-    fig, axes = plt.subplots(1, 3, figsize=(20, 6))
-
-    # --- Subgráfico 1: Distribución muestral de las clases ---
-    sns.countplot(
-        data=df,
-        x='estado_final',
-        order=classes,
-        hue='estado_final',
-        palette='Set2',
-        legend=False,
-        ax=axes[0]
+    num_cols = _validate_numeric_columns(
+        df,
+        num_cols
     )
-    axes[0].set_title('Distribución de Estudiantes (SPADIES 3.0)', fontsize=13, fontweight='bold')
-    axes[0].set_xlabel('Estado Académico Final', fontsize=11)
-    axes[0].set_ylabel('Número de Estudiantes', fontsize=11)
 
-    # Ciclo para rotular cada barra con su conteo exacto y porcentaje relativo
-    for p in axes[0].patches:
-        height = p.get_height()
-        axes[0].annotate(
-            f'{int(height)} ({height/len(df)*100:.1f}%)',
-            (p.get_x() + p.get_width() / 2.0, height / 2.0),
-            ha='center', va='center', fontsize=10, color='white', fontweight='bold'
+    data = df.dropna(
+        subset=["estado_final"]
+    ).copy()
+
+    if data.empty:
+        raise ValueError(
+            "No existen registros válidos."
         )
 
-    # Crear indicador binario focal para correlaciones (1: Desertor, 0: Otro)
-    des_binary = (df['estado_final'] == 'Desertor').astype(int)
+    desertor_binary = (
+        data["estado_final"] == "Desertor"
+    ).astype(int)
 
-    # --- Subgráfico 2: Correlación de Pearson ---
-    corr_p = df[num_cols].apply(lambda col: col.corr(des_binary, method='pearson')).sort_values()
-    colors_p = ['#d95f02' if c > 0 else '#7570b3' for c in corr_p.values]
-    axes[1].barh(corr_p.index, corr_p.values, color=colors_p)
-    axes[1].set_title('Correlación de Pearson con Deserción', fontsize=13, fontweight='bold')
-    axes[1].set_xlabel('Coeficiente Pearson', fontsize=11)
-    axes[1].axvline(0, color='black', linestyle='--', linewidth=0.8)
+    pearson_values = {}
+    spearman_values = {}
 
-    # --- Subgráfico 3: Correlación de Spearman ---
-    corr_s = df[num_cols].apply(lambda col: col.corr(des_binary, method='spearman')).sort_values()
-    colors_s = ['#1b9e77' if c > 0 else '#e7298a' for c in corr_s.values]
-    axes[2].barh(corr_s.index, corr_s.values, color=colors_s)
-    axes[2].set_title('Correlación de Spearman (Monótona)', fontsize=13, fontweight='bold')
-    axes[2].set_xlabel('Coeficiente Spearman', fontsize=11)
-    axes[2].axvline(0, color='black', linestyle='--', linewidth=0.8)
+    for col in num_cols:
 
-    plt.tight_layout()
+        values = pd.to_numeric(
+            data[col],
+            errors="coerce"
+        )
 
-    # Guardar en disco si corresponde
-    if output_path is None:
-        FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = FIGURES_DIR / "eda_distribucion_correlaciones.png"
+        pearson_values[col] = values.corr(
+            desertor_binary,
+            method="pearson"
+        )
 
-    plt.savefig(output_path, dpi=300)
+        spearman_values[col] = values.corr(
+            desertor_binary,
+            method="spearman"
+        )
+
+    pearson = pd.Series(
+        pearson_values,
+        dtype=float
+    ).dropna()
+
+    spearman = pd.Series(
+        spearman_values,
+        dtype=float
+    ).dropna()
+
+    pearson = pearson.loc[
+        pearson.abs()
+        .sort_values(ascending=False)
+        .index
+    ].head(10).sort_values()
+
+    spearman = spearman.loc[
+        spearman.abs()
+        .sort_values(ascending=False)
+        .index
+    ].head(10).sort_values()
+
+    fig, axes = plt.subplots(
+        1,
+        3,
+        figsize=(21, 7),
+        gridspec_kw={
+            "width_ratios": [1, 1.2, 1.2]
+        }
+    )
+
+    # Distribución de clases.
+    counts = (
+        data["estado_final"]
+        .value_counts()
+        .reindex(classes, fill_value=0)
+    )
+
+    colors = [
+        _get_class_color(label, i)
+        for i, label in enumerate(classes)
+    ]
+
+    bars = axes[0].bar(
+        counts.index,
+        counts.values,
+        color=colors,
+        edgecolor="black",
+        linewidth=0.5
+    )
+
+    total = counts.sum()
+
+    for bar, count in zip(
+        bars,
+        counts.values
+    ):
+
+        percentage = (
+            100 * count / total
+            if total > 0
+            else 0
+        )
+
+        axes[0].text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            f"{count:,}\n({percentage:.1f}%)",
+            ha="center",
+            va="bottom",
+            fontsize=9
+        )
+
+    axes[0].set_title(
+        "Distribución de clases",
+        fontweight="bold"
+    )
+
+    axes[0].set_xlabel(
+        "Estado académico final"
+    )
+
+    axes[0].set_ylabel(
+        "Número de estudiantes"
+    )
+
+    axes[0].tick_params(
+        axis="x",
+        rotation=20
+    )
+
+    # Pearson.
+    if not pearson.empty:
+
+        colors_p = [
+            "#d95f02" if value > 0 else "#7570b3"
+            for value in pearson.values
+        ]
+
+        axes[1].barh(
+            pearson.index,
+            pearson.values,
+            color=colors_p
+        )
+
+    axes[1].axvline(
+        0,
+        color="black",
+        linestyle="--",
+        linewidth=0.9
+    )
+
+    axes[1].set_title(
+        "Correlación de Pearson",
+        fontweight="bold"
+    )
+
+    axes[1].set_xlabel(
+        "Coeficiente de correlación"
+    )
+
+    # Spearman.
+    if not spearman.empty:
+
+        colors_s = [
+            "#1b9e77" if value > 0 else "#e7298a"
+            for value in spearman.values
+        ]
+
+        axes[2].barh(
+            spearman.index,
+            spearman.values,
+            color=colors_s
+        )
+
+    axes[2].axvline(
+        0,
+        color="black",
+        linestyle="--",
+        linewidth=0.9
+    )
+
+    axes[2].set_title(
+        "Correlación de Spearman",
+        fontweight="bold"
+    )
+
+    axes[2].set_xlabel(
+        "Coeficiente de correlación"
+    )
+
+    fig.suptitle(
+        "Análisis exploratorio del conjunto de datos sintético",
+        fontsize=15,
+        fontweight="bold"
+    )
+
+    fig.text(
+        0.5,
+        0.005,
+        "Las correlaciones son descriptivas; no implican causalidad. "
+        "La variable objetivo es sintética.",
+        ha="center",
+        fontsize=9,
+        color="dimgray"
+    )
+
+    fig.tight_layout(
+        rect=[0, 0.04, 1, 0.94]
+    )
+
+    _save_figure(
+        fig,
+        output_path,
+        "eda_distribucion_correlaciones.png"
+    )
+
     return fig, axes
 
+
+# ============================================================
+# 2. DISTRIBUCIÓN DE VARIABLES CLAVE
+# ============================================================
 
 def plot_key_variables_distribution(
     df: pd.DataFrame,
     classes: Optional[List[str]] = None,
     output_path: Optional[Union[str, Path]] = None
-) -> Tuple[plt.Figure, Any]:
+):
     """
-    Figura 2: Diagramas de caja (Boxplots) que comparan la dispersión de las dos variables
-    predictoras de mayor peso académico (Promedio Acumulado y Asignaturas Reprobadas) entre estados.
-
-    Parámetros:
-    -----------
-    df : pd.DataFrame
-        DataFrame con los datos preprocesados.
-    classes : list of str, opcional
-        Lista ordenada de clases. Por defecto CLASSES.
-    output_path : str o Path, opcional
-        Ruta para persistir la imagen en disco.
-
-    Retorna:
-    --------
-    tuple:
-        (fig, axes) objetos de Matplotlib.
+    Boxplots de promedio académico y materias reprobadas.
     """
-    if classes is None:
-        classes = CLASSES
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    classes = _validate_target(
+        df,
+        classes
+    )
 
-    # Boxplot para Promedio Académico
+    required = [
+        "estado_final",
+        "promedio_academico",
+        "materias_reprobadas"
+    ]
+
+    _validate_dataframe(
+        df,
+        required
+    )
+
+    data = df[required].copy()
+
+    for col in [
+        "promedio_academico",
+        "materias_reprobadas"
+    ]:
+        data[col] = pd.to_numeric(
+            data[col],
+            errors="coerce"
+        )
+
+    data = data.dropna()
+
+    if data.empty:
+        raise ValueError(
+            "No hay datos válidos para generar los boxplots."
+        )
+
+    palette = {
+        label: _get_class_color(label, i)
+        for i, label in enumerate(classes)
+    }
+
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(16, 6)
+    )
+
     sns.boxplot(
-        data=df,
-        x='estado_final',
-        y='promedio_academico',
+        data=data,
+        x="estado_final",
+        y="promedio_academico",
         order=classes,
-        hue='estado_final',
-        palette='Set1',
-        legend=False,
+        hue="estado_final",
+        hue_order=classes,
+        palette=palette,
+        dodge=False,
         ax=axes[0]
     )
-    axes[0].set_title('Promedio Académico por Estado Académico', fontsize=14, fontweight='bold')
-    axes[0].set_xlabel('Estado del Estudiante', fontsize=12)
-    axes[0].set_ylabel('Promedio Académico (0.0 - 5.0)', fontsize=12)
 
-    # Boxplot para Materias Reprobadas
+    if axes[0].legend_ is not None:
+        axes[0].legend_.remove()
+
+    axes[0].set_title(
+        "Distribución del promedio académico",
+        fontweight="bold"
+    )
+
+    axes[0].set_xlabel(
+        "Estado académico"
+    )
+
+    axes[0].set_ylabel(
+        "Promedio académico"
+    )
+
+    axes[0].tick_params(
+        axis="x",
+        rotation=15
+    )
+
     sns.boxplot(
-        data=df,
-        x='estado_final',
-        y='materias_reprobadas',
+        data=data,
+        x="estado_final",
+        y="materias_reprobadas",
         order=classes,
-        hue='estado_final',
-        palette='Set1',
-        legend=False,
+        hue="estado_final",
+        hue_order=classes,
+        palette=palette,
+        dodge=False,
         ax=axes[1]
     )
-    axes[1].set_title('Materias Reprobadas por Estado Académico', fontsize=14, fontweight='bold')
-    axes[1].set_xlabel('Estado del Estudiante', fontsize=12)
-    axes[1].set_ylabel('Materias Reprobadas', fontsize=12)
 
-    plt.tight_layout()
+    if axes[1].legend_ is not None:
+        axes[1].legend_.remove()
 
-    if output_path is None:
-        FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = FIGURES_DIR / "eda_variables_clave.png"
+    axes[1].set_title(
+        "Distribución de materias reprobadas",
+        fontweight="bold"
+    )
 
-    plt.savefig(output_path, dpi=300)
+    axes[1].set_xlabel(
+        "Estado académico"
+    )
+
+    axes[1].set_ylabel(
+        "Número de materias reprobadas"
+    )
+
+    axes[1].tick_params(
+        axis="x",
+        rotation=15
+    )
+
+    fig.suptitle(
+        "Distribuciones descriptivas por estado académico",
+        fontsize=15,
+        fontweight="bold"
+    )
+
+    fig.text(
+        0.5,
+        0.005,
+        "Las diferencias describen el conjunto sintético y no demuestran "
+        "relaciones causales.",
+        ha="center",
+        fontsize=9,
+        color="dimgray"
+    )
+
+    fig.tight_layout(
+        rect=[0, 0.04, 1, 0.93]
+    )
+
+    _save_figure(
+        fig,
+        output_path,
+        "eda_variables_clave.png"
+    )
+
     return fig, axes
 
+
+# ============================================================
+# 3. IMPACTO DE LOS ESCALADORES
+# ============================================================
 
 def plot_scaler_impact(
     df: pd.DataFrame,
-    feature: str = 'distancia_hogar_ies_km',
+    feature: str = "distancia_hogar_ies_km",
     output_path: Optional[Union[str, Path]] = None
-) -> Tuple[plt.Figure, Any]:
+):
     """
-    Figura 3: Evidencia visual empírica del efecto de 6 técnicas de escalamiento sobre
-    la forma de la densidad (KDE) y distribución de una variable con marcada asimetría positiva.
+    Compara la variable original con seis transformaciones:
 
-    Parámetros:
-    -----------
-    df : pd.DataFrame
-        DataFrame con la variable a analizar.
-    feature : str, por defecto 'distancia_hogar_ies_km'
-        Nombre de la columna numérica continua.
-    output_path : str o Path, opcional
-        Ruta de destino para la imagen.
+    - StandardScaler
+    - MinMaxScaler
+    - RobustScaler
+    - QuantileTransformer
+    - MaxAbsScaler
+    - PowerTransformer
 
-    Retorna:
-    --------
-    tuple:
-        (fig, axes) objetos de Matplotlib.
+    Es una comparación ilustrativa, no una evaluación de modelos.
     """
-    sample_feature = df[[feature]].values
-    fig, axes = plt.subplots(2, 3, figsize=(16, 8))
 
-    # 1. Escala Original sin transformar
-    sns.histplot(sample_feature, kde=True, ax=axes[0, 0], color='gray')
-    axes[0, 0].set_title('1. Original (Raw)', fontweight='bold')
-
-    # 2. StandardScaler (Centrado en media 0, desviación unitaria)
-    sns.histplot(StandardScaler().fit_transform(sample_feature), kde=True, ax=axes[0, 1], color='blue')
-    axes[0, 1].set_title('2. Standard Scaler (Z-score)', fontweight='bold')
-
-    # 3. MinMaxScaler (Acotamiento estricto a [0, 1])
-    sns.histplot(MinMaxScaler().fit_transform(sample_feature), kde=True, ax=axes[0, 2], color='green')
-    axes[0, 2].set_title('3. Min Max Scaler (0 a 1)', fontweight='bold')
-
-    # 4. RobustScaler (Basado en mediana y rango intercuartílico IQR)
-    sns.histplot(RobustScaler().fit_transform(sample_feature), kde=True, ax=axes[1, 0], color='purple')
-    axes[1, 0].set_title('4. Robust Scaler (Mediana e IQR)', fontweight='bold')
-
-    # 5. QuantileTransformer (Mapeo a distribución uniforme)
-    sns.histplot(
-        QuantileTransformer(n_quantiles=50, random_state=42).fit_transform(sample_feature),
-        kde=True, ax=axes[1, 1], color='orange'
+    _validate_dataframe(
+        df,
+        [feature]
     )
-    axes[1, 1].set_title('5. Quantile Transformer (Uniforme)', fontweight='bold')
 
-    # 6. PowerTransformer (Transformación de potencia Yeo-Johnson estabilizadora)
-    sns.histplot(PowerTransformer().fit_transform(sample_feature), kde=True, ax=axes[1, 2], color='red')
-    axes[1, 2].set_title('6. Power Transformer (Yeo-Johnson)', fontweight='bold')
+    values = pd.to_numeric(
+        df[feature],
+        errors="coerce"
+    ).dropna().values.reshape(-1, 1)
 
-    plt.tight_layout()
+    if len(values) < 2:
+        raise ValueError(
+            f"La variable {feature} no tiene suficientes observaciones."
+        )
 
-    if output_path is None:
-        FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = FIGURES_DIR / "eda_efecto_escaladores.png"
+    if np.unique(values).size < 2:
+        raise ValueError(
+            f"La variable {feature} es constante."
+        )
 
-    plt.savefig(output_path, dpi=300)
+    transformers = [
+        (
+            "StandardScaler",
+            StandardScaler()
+        ),
+        (
+            "MinMaxScaler",
+            MinMaxScaler()
+        ),
+        (
+            "RobustScaler",
+            RobustScaler()
+        ),
+        (
+            "QuantileTransformer",
+            QuantileTransformer(
+                n_quantiles=min(50, len(values)),
+                output_distribution="uniform",
+                random_state=42
+            )
+        ),
+        (
+            "MaxAbsScaler",
+            MaxAbsScaler()
+        ),
+        (
+            "PowerTransformer",
+            PowerTransformer(
+                method="yeo-johnson"
+            )
+        )
+    ]
+
+    fig, axes = plt.subplots(
+        2,
+        4,
+        figsize=(19, 9)
+    )
+
+    axes = axes.flatten()
+
+    sns.histplot(
+        values.ravel(),
+        bins=35,
+        stat="density",
+        color="gray",
+        ax=axes[0]
+    )
+
+    axes[0].set_title(
+        "Variable original",
+        fontweight="bold"
+    )
+
+    for index, (name, transformer) in enumerate(
+        transformers,
+        start=1
+    ):
+
+        transformed = transformer.fit_transform(
+            values
+        )
+
+        sns.histplot(
+            transformed.ravel(),
+            bins=35,
+            stat="density",
+            color=sns.color_palette("Set2")[index % 8],
+            ax=axes[index]
+        )
+
+        axes[index].set_title(
+            name,
+            fontweight="bold"
+        )
+
+    axes[-1].axis("off")
+
+    fig.suptitle(
+        f"Impacto de las transformaciones sobre {feature}",
+        fontsize=15,
+        fontweight="bold"
+    )
+
+    fig.text(
+        0.5,
+        0.005,
+        "Transformadores ajustados sobre los datos recibidos únicamente "
+        "con fines ilustrativos. No representa el rendimiento de los pipelines.",
+        ha="center",
+        fontsize=9,
+        color="dimgray"
+    )
+
+    fig.tight_layout(
+        rect=[0, 0.04, 1, 0.93]
+    )
+
+    _save_figure(
+        fig,
+        output_path,
+        "eda_efecto_escaladores.png"
+    )
+
     return fig, axes
 
+
+# ============================================================
+# 4. COMPARACIÓN DE NORMALIZACIONES
+# ============================================================
 
 def plot_normalization_comparison(
     summary_df: pd.DataFrame,
     n_trials: int = 50,
-    metric_col: str = 'Average F1 (Weighted)',
+    metric_col: str = "Average F1 (Macro)",
     output_path: Optional[Union[str, Path]] = None
-) -> Tuple[plt.Figure, Any]:
+):
     """
-    Figura 4: Diagrama de barras comparativo de rendimiento multiclase que contrasta
-    los escaladores evaluados frente al modelo Baseline sin normalizar.
+    Compara el rendimiento promedio de las configuraciones.
 
-    Parámetros:
-    -----------
-    summary_df : pd.DataFrame
-        Tabla resumen con las métricas consolidadas de las repeticiones.
-    n_trials : int, por defecto 50
-        Número de iteraciones representadas para indicar en el título.
-    metric_col : str, por defecto 'Average F1 (Weighted)'
-        Columna numérica del DataFrame utilizada como eje X.
-    output_path : str o Path, opcional
-        Ruta para guardar la figura.
+    Admite:
+    - Average F1 (Macro)
+    - Average F1 (Weighted)
+    - Average F1 (Desertor)
 
-    Retorna:
-    --------
-    tuple:
-        (fig, ax) objetos de Matplotlib.
+    Utiliza la desviación estándar correspondiente cuando existe.
     """
-    fig, ax = plt.subplots(figsize=(12, 6))
 
-    # Colores semánticos: naranja para el baseline y verde azulado para los métodos evaluados
-    colors_bar = ['#d95f02' if 'Baseline' in name else '#1b9e77' for name in summary_df['Normalization Method']]
-
-    barplot = sns.barplot(
-        data=summary_df,
-        x=metric_col,
-        y='Normalization Method',
-        hue='Normalization Method',
-        palette=colors_bar,
-        legend=False,
-        ax=ax
+    _validate_dataframe(
+        summary_df,
+        [
+            "Normalization Method",
+            metric_col
+        ]
     )
 
-    ax.set_title(
-        f'Evaluación de Pipelines SVM Multiclase ({metric_col}, {n_trials} Trials)',
-        fontsize=14, fontweight='bold'
-    )
-    ax.set_xlabel('F1-Score Ponderado Promedio (3 Clases)', fontsize=12)
-    ax.set_ylabel('Método de Normalización en Pipeline', fontsize=12)
-    ax.set_xlim(0.40, 1.0)
+    data = summary_df.copy()
 
-    # Ciclo para etiquetar el valor numérico en el extremo de cada barra
-    for p in barplot.patches:
-        width = p.get_width()
-        barplot.annotate(
-            f'{width:.4f}',
-            (width + 0.005, p.get_y() + p.get_height() / 2.0),
-            ha='left', va='center', fontsize=10, fontweight='bold'
+    data[metric_col] = pd.to_numeric(
+        data[metric_col],
+        errors="coerce"
+    )
+
+    data = data.dropna(
+        subset=[metric_col]
+    )
+
+    if data.empty:
+        raise ValueError(
+            "No existen resultados válidos para comparar."
         )
 
-    plt.tight_layout()
+    std_col = metric_col.replace(
+        "Average",
+        "Std"
+    )
 
-    if output_path is None:
-        FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = FIGURES_DIR / "svm_normalizacion_vs_baseline.png"
+    data["_std"] = 0.0
 
-    plt.savefig(output_path, dpi=300)
+    if std_col in data.columns:
+
+        data["_std"] = pd.to_numeric(
+            data[std_col],
+            errors="coerce"
+        ).fillna(0)
+
+    data["_std"] = data["_std"].clip(
+        lower=0
+    )
+
+    data = data.sort_values(
+        metric_col,
+        ascending=True
+    ).reset_index(drop=True)
+
+    methods = data[
+        "Normalization Method"
+    ].astype(str).values
+
+    values = data[
+        metric_col
+    ].values
+
+    errors = data[
+        "_std"
+    ].values
+
+    colors = [
+        "#d95f02"
+        if (
+            "baseline" in name.lower()
+            or "no normalization" in name.lower()
+        )
+        else "#1b9e77"
+        for name in methods
+    ]
+
+    fig, ax = plt.subplots(
+        figsize=(13, 7)
+    )
+
+    positions = np.arange(
+        len(data)
+    )
+
+    ax.barh(
+        positions,
+        values,
+        xerr=errors,
+        color=colors,
+        capsize=4,
+        edgecolor="black",
+        linewidth=0.4
+    )
+
+    ax.set_yticks(positions)
+    ax.set_yticklabels(methods)
+
+    ax.set_xlabel(metric_col)
+    ax.set_ylabel("Configuración")
+
+    ax.set_title(
+        f"Comparación de configuraciones SVM "
+        f"({metric_col}, {n_trials} trials)",
+        fontsize=14,
+        fontweight="bold"
+    )
+
+    lower = max(
+        0,
+        float(np.nanmin(values - errors)) - 0.05
+    )
+
+    upper = min(
+        1.05,
+        float(np.nanmax(values + errors)) + 0.08
+    )
+
+    if upper <= lower:
+        upper = min(1.05, lower + 0.1)
+
+    ax.set_xlim(
+        lower,
+        upper
+    )
+
+    for position, value in zip(
+        positions,
+        values
+    ):
+
+        ax.text(
+            value + 0.005,
+            position,
+            f"{value:.4f}",
+            va="center",
+            fontsize=9
+        )
+
+    ax.grid(
+        axis="x",
+        linestyle="--",
+        alpha=0.4
+    )
+
+    fig.tight_layout()
+
+    _save_figure(
+        fig,
+        output_path,
+        "svm_normalizacion_vs_baseline.png"
+    )
+
     return fig, ax
 
+
+# ============================================================
+# 5. IMPORTANCIA DE VARIABLES POR PERMUTACIÓN
+# ============================================================
+
+
+# ============================================================
+# 5. IMPORTANCIA DE VARIABLES POR PERMUTACIÓN
+# ============================================================
 
 def plot_permutation_importance(
     imp_df: pd.DataFrame,
     top_n: int = 15,
     output_path: Optional[Union[str, Path]] = None
-) -> Tuple[plt.Figure, Any]:
+):
     """
-    Figura 5: Gráfico horizontal de barras de error con la Importancia de Variables por Permutación.
+    Visualiza la importancia de variables por permutación.
 
-    Parámetros:
-    -----------
-    imp_df : pd.DataFrame
-        DataFrame con las columnas 'Feature', 'Importance_Mean' e 'Importance_Std'.
-    top_n : int, por defecto 15
-        Cantidad de variables más influyentes a graficar.
-    output_path : str o Path, opcional
-        Ruta destino de la figura.
+    Admite los dos formatos de columnas:
 
-    Retorna:
-    --------
-    tuple:
-        (fig, ax) objetos de Matplotlib.
+    Formato 1:
+    - Feature
+    - Importance Mean
+    - Importance Std
+
+    Formato 2:
+    - Feature
+    - Importance_Mean
+    - Importance_Std
+
+    La métrica utilizada por evaluate.py es F1 macro.
+
+    Las importancias negativas son válidas: indican que la
+    permutación de una variable no mejoró el rendimiento y,
+    en ese ensayo, incluso pudo aumentarlo.
     """
-    fig, ax = plt.subplots(figsize=(10, 8))
-    top_df = imp_df.head(top_n)
 
-    # Graficar en orden inverso para que la variable más importante aparezca en la parte superior
+    if not isinstance(imp_df, pd.DataFrame):
+        raise TypeError(
+            "imp_df debe ser un pandas.DataFrame."
+        )
+
+    if not isinstance(top_n, int) or top_n < 1:
+        raise ValueError(
+            "top_n debe ser un entero mayor que cero."
+        )
+
+    data = imp_df.copy()
+
+    # --------------------------------------------------------
+    # Compatibilidad de nombres de columnas
+    # --------------------------------------------------------
+
+    column_aliases = {
+        "Importance Mean": "Importance_Mean",
+        "Importance Std": "Importance_Std"
+    }
+
+    data = data.rename(
+        columns={
+            old: new
+            for old, new in column_aliases.items()
+            if old in data.columns
+            and new not in data.columns
+        }
+    )
+
+    required = [
+        "Feature",
+        "Importance_Mean",
+        "Importance_Std"
+    ]
+
+    _validate_dataframe(
+        data,
+        required
+    )
+
+    # --------------------------------------------------------
+    # Conversión y limpieza de datos
+    # --------------------------------------------------------
+
+    data["Feature"] = (
+        data["Feature"]
+        .astype(str)
+        .str.strip()
+    )
+
+    data["Importance_Mean"] = pd.to_numeric(
+        data["Importance_Mean"],
+        errors="coerce"
+    )
+
+    data["Importance_Std"] = pd.to_numeric(
+        data["Importance_Std"],
+        errors="coerce"
+    )
+
+    data = data.replace(
+        [np.inf, -np.inf],
+        np.nan
+    )
+
+    data = data.dropna(
+        subset=[
+            "Feature",
+            "Importance_Mean"
+        ]
+    )
+
+    data["Importance_Std"] = (
+        data["Importance_Std"]
+        .fillna(0)
+        .clip(lower=0)
+    )
+
+    data = data[
+        data["Feature"] != ""
+    ]
+
+    if data.empty:
+        raise ValueError(
+            "No hay importancias numéricas válidas para graficar."
+        )
+
+    # --------------------------------------------------------
+    # Selección de las variables más importantes
+    # --------------------------------------------------------
+
+    data = data.sort_values(
+        "Importance_Mean",
+        ascending=False
+    ).head(top_n)
+
+    data = data.sort_values(
+        "Importance_Mean",
+        ascending=True
+    ).reset_index(drop=True)
+
+    # --------------------------------------------------------
+    # Construcción de la figura
+    # --------------------------------------------------------
+
+    fig, ax = plt.subplots(
+        figsize=(
+            11,
+            max(6, len(data) * 0.4)
+        )
+    )
+
     ax.barh(
-        top_df['Feature'][::-1],
-        top_df['Importance_Mean'][::-1],
-        color='#2b5c8f',
-        xerr=top_df['Importance_Std'][::-1]
+        data["Feature"],
+        data["Importance_Mean"],
+        xerr=data["Importance_Std"],
+        color="#2b5c8f",
+        capsize=3,
+        edgecolor="black",
+        linewidth=0.4,
+        error_kw={
+            "elinewidth": 1,
+            "capthick": 1
+        }
+    )
+
+    # Referencia de importancia cero.
+    ax.axvline(
+        0,
+        color="black",
+        linestyle="--",
+        linewidth=0.8
     )
 
     ax.set_title(
-        'Importancia de Variables en Pipeline SVM (Permutation Importance Multiclase)',
-        fontsize=14, fontweight='bold'
+        "Importancia de variables por permutación",
+        fontsize=14,
+        fontweight="bold"
     )
-    ax.set_xlabel('Disminución Promedio en F1-Score Ponderado al Permutar Variable', fontsize=12)
-    plt.tight_layout()
 
-    if output_path is None:
-        FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = FIGURES_DIR / "svm_importancia_variables.png"
+    ax.set_xlabel(
+        "Disminución promedio del F1 macro al permutar la variable"
+    )
 
-    plt.savefig(output_path, dpi=300)
+    ax.set_ylabel(
+        "Variable"
+    )
+
+    ax.grid(
+        axis="x",
+        linestyle="--",
+        alpha=0.35
+    )
+
+    # --------------------------------------------------------
+    # Anotación metodológica
+    # --------------------------------------------------------
+
+    ax.text(
+        0.01,
+        -0.13,
+        "Valores positivos indican pérdida de rendimiento al permutar "
+        "la variable; valores negativos indican una mejora observada.",
+        transform=ax.transAxes,
+        fontsize=8,
+        color="dimgray"
+    )
+
+    fig.tight_layout()
+
+    # --------------------------------------------------------
+    # Exportación
+    # --------------------------------------------------------
+
+    _save_figure(
+        fig,
+        output_path,
+        "svm_importancia_variables.png"
+    )
+
     return fig, ax
 
 
+
+# ============================================================
+# 6. PROYECCIÓN PCA Y VECTORES DE SOPORTE
+# ============================================================
+
 def plot_pca_hyperplane(
-    pipeline: Pipeline,
+    pipeline,
     X_train: pd.DataFrame,
     y_train: np.ndarray,
     X_test: pd.DataFrame,
@@ -393,170 +1271,326 @@ def plot_pca_hyperplane(
     classes: Optional[List[str]] = None,
     sample_size: int = 1000,
     random_state: int = 42,
-    output_path: Optional[Union[str, Path]] = None
-) -> Tuple[plt.Figure, Any]:
+    output_path: Optional[Union[str, Path]] = None,
+    model_name: str = "SVM"
+):
     """
-    Figura 6: Visualización de las fronteras de decisión y los vectores de soporte
-    del modelo SVM proyectados sobre las dos componentes principales (PCA 2D).
+    Proyecta mediante PCA las observaciones de prueba y los vectores
+    de soporte de un SVM entrenado.
 
-    Parámetros:
-    -----------
-    pipeline : Pipeline
-        Pipeline SVM ajustado que contiene el paso 'preprocessor'.
-    X_train : pd.DataFrame
-        Características de entrenamiento para ajustar el proyector PCA.
-    y_train : np.ndarray
-        Etiquetas de clase de entrenamiento.
-    X_test : pd.DataFrame
-        Características de prueba para visualización de dispersión.
-    y_test : np.ndarray
-        Etiquetas de clase de prueba.
-    classes : list of str, opcional
-        Lista ordenada de clases. Por defecto CLASSES.
-    sample_size : int, por defecto 1000
-        Número de puntos de prueba a graficar para evitar sobrecarga visual.
-    random_state : int, por defecto 42
-        Semilla para el muestreo y PCA.
-    output_path : str o Path, opcional
-        Ruta para guardar la imagen.
+    PCA se ajusta exclusivamente con las características transformadas
+    del conjunto de entrenamiento.
 
-    Retorna:
-    --------
-    tuple:
-        (fig, ax) objetos de Matplotlib.
+    No representa las fronteras reales del SVM.
     """
+
     if classes is None:
-        classes = CLASSES
+        classes = list(CLASSES)
 
-    # 1. Transformar datos mediante el preprocesador del pipeline ajustado
-    X_train_trans = pipeline.named_steps['preprocessor'].transform(X_train)
-    X_test_trans = pipeline.named_steps['preprocessor'].transform(X_test)
-
-    # 2. Reducir dimensionalidad a 2 dimensiones con Análisis de Componentes Principales
-    pca = PCA(n_components=2, random_state=random_state)
-    X_train_pca = pca.fit_transform(X_train_trans)
-    X_test_pca = pca.transform(X_test_trans)
-
-    # 3. Ajustar un clasificador SVM bidimensional para mapear las regiones de decisión continuas
-    svm_pca = SVC(kernel='rbf', C=1.0, class_weight='balanced', random_state=random_state)
-    svm_pca.fit(X_train_pca, y_train)
-
-    # 4. Crear rejilla de evaluación (Meshgrid) sobre el espacio 2D
-    x_min, x_max = X_train_pca[:, 0].min() - 0.5, X_train_pca[:, 0].max() + 0.5
-    y_min, y_max = X_train_pca[:, 1].min() - 0.5, X_train_pca[:, 1].max() + 0.5
-    xx, yy = np.meshgrid(np.linspace(x_min, x_max, 400), np.linspace(y_min, y_max, 400))
-
-    # Predecir sobre cada punto de la malla para delimitar las regiones de las clases
-    Z = svm_pca.predict(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape)
-
-    fig, ax = plt.subplots(figsize=(11, 8))
-
-    # Colorear regiones de decisión con contornos suaves
-    ax.contourf(xx, yy, Z, alpha=0.3, cmap='Set2')
-
-    # Submuestrear puntos de prueba para representación limpia
-    np.random.seed(random_state)
-    sample_idx = np.random.choice(len(y_test), size=min(sample_size, len(y_test)), replace=False)
-    X_sample_pca = X_test_pca[sample_idx]
-    y_sample = y_test[sample_idx]
-
-    # Ciclo para dispersar los estudiantes de cada clase con su respectivo color
-    for idx_c, label_c in enumerate(classes):
-        ax.scatter(
-            X_sample_pca[y_sample == idx_c, 0],
-            X_sample_pca[y_sample == idx_c, 1],
-            c=SCATTER_PALETTE[idx_c],
-            label=label_c,
-            alpha=0.6,
-            edgecolors='k',
-            s=30
-        )
-
-    # Resaltar los vectores de soporte (Support Vectors) seleccionados por el algoritmo
-    sv = svm_pca.support_vectors_
-    ax.scatter(
-        sv[:, 0],
-        sv[:, 1],
-        s=80,
-        facecolors='none',
-        edgecolors='black',
-        linewidths=1.0,
-        label=f'Vectores de Soporte ({len(sv)} puntos)'
+    _validate_sample_size(
+        sample_size,
+        minimum=2
     )
 
-    ax.set_title('Fronteras de Decisión SVM Multiclase (Kernel RBF en PCA 2D)', fontsize=14, fontweight='bold')
-    ax.set_xlabel(f'Componente Principal 1 ({pca.explained_variance_ratio_[0]*100:.1f}% Varianza)', fontsize=12)
-    ax.set_ylabel(f'Componente Principal 2 ({pca.explained_variance_ratio_[1]*100:.1f}% Varianza)', fontsize=12)
-    ax.legend(loc='upper right', frameon=True)
+    if not hasattr(pipeline, "named_steps"):
+        raise TypeError(
+            "pipeline debe ser un sklearn Pipeline."
+        )
 
-    plt.tight_layout()
+    if "preprocessor" not in pipeline.named_steps:
+        raise ValueError(
+            "El pipeline debe contener el paso 'preprocessor'."
+        )
 
-    if output_path is None:
-        FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = FIGURES_DIR / "svm_hiperplano_pca_2d.png"
+    svm_model = _get_svm_from_pipeline(
+        pipeline
+    )
 
-    plt.savefig(output_path, dpi=300)
+    if len(X_train) < 2:
+        raise ValueError(
+            "Se necesitan al menos dos observaciones de entrenamiento."
+        )
+
+    if len(X_test) == 0:
+        raise ValueError(
+            "El conjunto de prueba está vacío."
+        )
+
+    preprocessor = pipeline.named_steps[
+        "preprocessor"
+    ]
+
+    X_train_trans = _to_dense(
+        preprocessor.transform(X_train)
+    )
+
+    X_test_trans = _to_dense(
+        preprocessor.transform(X_test)
+    )
+
+    if X_train_trans.shape[1] < 2:
+        raise ValueError(
+            "PCA necesita al menos dos características transformadas."
+        )
+
+    if svm_model.support_vectors_.shape[1] != X_train_trans.shape[1]:
+        raise ValueError(
+            "Las dimensiones de los vectores de soporte no coinciden "
+            "con las características transformadas."
+        )
+
+    pca = PCA(
+        n_components=2,
+        random_state=random_state
+    )
+
+    pca.fit(
+        X_train_trans
+    )
+
+    X_test_pca = pca.transform(
+        X_test_trans
+    )
+
+    support_vectors_pca = pca.transform(
+        svm_model.support_vectors_
+    )
+
+    y_test_array = np.asarray(y_test)
+
+    if len(y_test_array) != len(X_test):
+        raise ValueError(
+            "y_test y X_test deben tener la misma cantidad de registros."
+        )
+
+    rng = np.random.default_rng(
+        random_state
+    )
+
+    sample_idx = rng.choice(
+        len(y_test_array),
+        size=min(sample_size, len(y_test_array)),
+        replace=False
+    )
+
+    fig, ax = plt.subplots(
+        figsize=(11, 8)
+    )
+
+    sampled_labels = y_test_array[sample_idx]
+
+    for index, label in enumerate(classes):
+
+        mask = sampled_labels == label
+
+        if not np.any(mask):
+            continue
+
+        ax.scatter(
+            X_test_pca[sample_idx][mask, 0],
+            X_test_pca[sample_idx][mask, 1],
+            color=_get_class_color(label, index),
+            label=label,
+            alpha=0.62,
+            edgecolors="white",
+            linewidths=0.25,
+            s=25
+        )
+
+    ax.scatter(
+        support_vectors_pca[:, 0],
+        support_vectors_pca[:, 1],
+        s=40,
+        facecolors="none",
+        edgecolors="black",
+        linewidths=0.7,
+        alpha=0.7,
+        label=(
+            f"Vectores de soporte "
+            f"(n={len(support_vectors_pca)})"
+        )
+    )
+
+    variance_1 = (
+        pca.explained_variance_ratio_[0] * 100
+    )
+
+    variance_2 = (
+        pca.explained_variance_ratio_[1] * 100
+    )
+
+    ax.set_title(
+        f"Proyección PCA de observaciones y vectores de soporte "
+        f"({model_name})",
+        fontsize=13,
+        fontweight="bold"
+    )
+
+    ax.set_xlabel(
+        f"Componente principal 1 ({variance_1:.1f}%)"
+    )
+
+    ax.set_ylabel(
+        f"Componente principal 2 ({variance_2:.1f}%)"
+    )
+
+    ax.text(
+        0.01,
+        0.01,
+        "PCA es una proyección visual y no representa "
+        "las fronteras reales del SVM.",
+        transform=ax.transAxes,
+        fontsize=8,
+        color="dimgray"
+    )
+
+    ax.legend(
+        loc="best",
+        fontsize=9
+    )
+
+    fig.tight_layout()
+
+    filename = (
+        "svm_proyeccion_pca_"
+        f"{str(model_name).lower().replace(' ', '_')}.png"
+    )
+
+    _save_figure(
+        fig,
+        output_path,
+        filename
+    )
+
     return fig, ax
 
+
+# ============================================================
+# 7. MATRICES DE CONFUSIÓN
+# ============================================================
 
 def plot_confusion_matrices(
     cm: np.ndarray,
     classes: Optional[List[str]] = None,
     output_path: Optional[Union[str, Path]] = None
-) -> Tuple[plt.Figure, Any]:
+):
     """
-    Figura 7: Genera un panel dual con la matriz de confusión multiclase 3x3:
-    - Izquierda: Conteos absolutos de clasificaciones correctas e incorrectas.
-    - Derecha: Matriz normalizada por fila (Sensibilidad o Recall por clase real).
+    Genera matriz de confusión absoluta y normalizada por filas.
 
-    Parámetros:
-    -----------
-    cm : np.ndarray
-        Matriz de confusión cruda calculada con sklearn.metrics.confusion_matrix.
-    classes : list of str, opcional
-        Nombres cualitativos de las clases. Por defecto CLASSES.
-    output_path : str o Path, opcional
-        Ruta para guardar la imagen generada.
-
-    Retorna:
-    --------
-    tuple:
-        (fig, axes) objetos de Matplotlib.
+    La normalización por filas representa el recall de cada clase.
     """
+
     if classes is None:
-        classes = CLASSES
+        classes = list(CLASSES)
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    cm = np.asarray(cm)
 
-    # --- Subgráfico 1: Conteos Absolutos ---
-    sns.heatmap(
-        cm, annot=True, fmt='d', cmap='Blues', cbar=False, ax=axes[0],
-        xticklabels=classes, yticklabels=classes, annot_kws={'size': 13, 'weight': 'bold'}
+    expected_shape = (
+        len(classes),
+        len(classes)
     )
-    axes[0].set_title('Matriz de Confusión (Conteos Absolutos)', fontsize=14, fontweight='bold')
-    axes[0].set_xlabel('Predicción del Modelo', fontsize=12)
-    axes[0].set_ylabel('Estado Real', fontsize=12)
 
-    # --- Subgráfico 2: Normalizada por fila (Recall por clase) ---
-    # Dividir cada fila entre la suma de sus elementos para obtener probabilidades condicionales
-    cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-    sns.heatmap(
-        cm_norm, annot=True, fmt='.2f', cmap='Blues', cbar=False, ax=axes[1],
-        xticklabels=classes, yticklabels=classes, annot_kws={'size': 13, 'weight': 'bold'}
+    if cm.shape != expected_shape:
+        raise ValueError(
+            f"La matriz debe tener forma {expected_shape}; "
+            f"se recibió {cm.shape}."
+        )
+
+    if not np.issubdtype(cm.dtype, np.number):
+        raise TypeError(
+            "La matriz de confusión debe contener valores numéricos."
+        )
+
+    if not np.all(np.isfinite(cm)):
+        raise ValueError(
+            "La matriz contiene valores no finitos."
+        )
+
+    if np.any(cm < 0):
+        raise ValueError(
+            "La matriz no puede contener valores negativos."
+        )
+
+    row_totals = cm.sum(
+        axis=1,
+        keepdims=True
     )
-    axes[1].set_title('Matriz de Confusión Normalizada por Clase Real (Recall)', fontsize=14, fontweight='bold')
-    axes[1].set_xlabel('Predicción del Modelo', fontsize=12)
-    axes[1].set_ylabel('Estado Real', fontsize=12)
 
-    plt.tight_layout()
+    cm_norm = np.divide(
+        cm.astype(float),
+        row_totals,
+        out=np.zeros_like(cm, dtype=float),
+        where=row_totals != 0
+    )
 
-    if output_path is None:
-        FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = FIGURES_DIR / "svm_matriz_confusion_roc.png"
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(16, 6)
+    )
 
-    plt.savefig(output_path, dpi=300)
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="g",
+        cmap="Blues",
+        cbar=False,
+        ax=axes[0],
+        xticklabels=classes,
+        yticklabels=classes,
+        annot_kws={
+            "size": 12,
+            "weight": "bold"
+        }
+    )
+
+    axes[0].set_title(
+        "Matriz de confusión: conteos absolutos",
+        fontweight="bold"
+    )
+
+    axes[0].set_xlabel("Clase predicha")
+    axes[0].set_ylabel("Clase real")
+
+    sns.heatmap(
+        cm_norm,
+        annot=True,
+        fmt=".2f",
+        cmap="Blues",
+        vmin=0,
+        vmax=1,
+        cbar=False,
+        ax=axes[1],
+        xticklabels=classes,
+        yticklabels=classes,
+        annot_kws={
+            "size": 12,
+            "weight": "bold"
+        }
+    )
+
+    axes[1].set_title(
+        "Matriz normalizada por clase real (Recall)",
+        fontweight="bold"
+    )
+
+    axes[1].set_xlabel("Clase predicha")
+    axes[1].set_ylabel("Clase real")
+
+    fig.tight_layout()
+
+    _save_figure(
+        fig,
+        output_path,
+        "svm_matriz_confusion.png"
+    )
+
     return fig, axes
 
+
+# ============================================================
+# 8. FRONTERA BINARIA EXPLORATORIA
+# ============================================================
 
 def plot_decision_boundary_top2(
     df: pd.DataFrame,
@@ -564,132 +1598,795 @@ def plot_decision_boundary_top2(
     output_path: Optional[Union[str, Path]] = None,
     sample_size: int = 300,
     random_state: int = 42
-) -> Tuple[plt.Figure, Any]:
+):
     """
-    Genera la visualización cristalina del hiperplano de decisión de SVM y márgenes
-    sobre las dos variables predictoras de mayor relevancia (Promedio Académico y Materias Reprobadas).
-    Permite interpretar intuitivamente la separación de clases sin la abstracción del PCA.
-    """
-    if features is None:
-        features = ['promedio_academico', 'materias_reprobadas']
+    Entrena un SVM RBF binario independiente para visualizar
+    Desertor frente al resto usando dos variables.
 
-    X = df[features].values
-    y_bin = (df['estado_final'] == 'Desertor').astype(int).values
+    Debe recibir únicamente datos de entrenamiento/desarrollo,
+    nunca el test final.
+
+    No representa el pipeline multiclase definitivo.
+    """
+
+    if features is None:
+        features = [
+            "promedio_academico",
+            "materias_reprobadas"
+        ]
+
+    if len(features) != 2:
+        raise ValueError(
+            "Se deben proporcionar exactamente dos variables."
+        )
+
+    _validate_sample_size(
+        sample_size,
+        minimum=10
+    )
+
+    _validate_dataframe(
+        df,
+        features + ["estado_final"]
+    )
+
+    data = df[
+        features + ["estado_final"]
+    ].copy()
+
+    for col in features:
+        data[col] = pd.to_numeric(
+            data[col],
+            errors="coerce"
+        )
+
+    data = data.dropna(
+        subset=features + ["estado_final"]
+    )
+
+    data["target_binario"] = (
+        data["estado_final"] == "Desertor"
+    ).astype(int)
+
+    if data["target_binario"].nunique() != 2:
+        raise ValueError(
+            "Se necesitan registros Desertor y no Desertor."
+        )
+
+    if len(data) < 10:
+        raise ValueError(
+            "No hay suficientes registros para el análisis."
+        )
+
+    if data["target_binario"].value_counts().min() < 2:
+        raise ValueError(
+            "Cada clase necesita al menos dos observaciones."
+        )
+
+    # Muestreo estratificado.
+    if len(data) > sample_size:
+
+        sampled_parts = []
+
+        proportions = (
+            data["target_binario"]
+            .value_counts(normalize=True)
+        )
+
+        for label in [0, 1]:
+
+            group = data[
+                data["target_binario"] == label
+            ]
+
+            n_group = max(
+                1,
+                int(round(sample_size * proportions[label]))
+            )
+
+            n_group = min(
+                n_group,
+                len(group)
+            )
+
+            sampled_parts.append(
+                group.sample(
+                    n=n_group,
+                    random_state=random_state
+                )
+            )
+
+        data = pd.concat(
+            sampled_parts
+        ).sample(
+            frac=1,
+            random_state=random_state
+        )
+
+    X = data[features].values
+    y = data["target_binario"].values
 
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
 
-    svm = SVC(kernel='rbf', C=1.0, random_state=random_state)
-    svm.fit(X_scaled, y_bin)
+    X_scaled = scaler.fit_transform(
+        X
+    )
+
+    svm = SVC(
+        kernel="rbf",
+        C=1.0,
+        class_weight="balanced"
+    )
+
+    svm.fit(
+        X_scaled,
+        y
+    )
 
     x_min, x_max = X[:, 0].min(), X[:, 0].max()
     y_min, y_max = X[:, 1].min(), X[:, 1].max()
 
-    xx, yy = np.meshgrid(np.linspace(x_min, x_max, 300), np.linspace(y_min, y_max, 300))
-    grid_scaled = scaler.transform(np.c_[xx.ravel(), yy.ravel()])
-    Z = svm.decision_function(grid_scaled).reshape(xx.shape)
+    x_padding = max(
+        (x_max - x_min) * 0.08,
+        0.1
+    )
 
-    fig, ax = plt.subplots(figsize=(10, 7))
+    y_padding = max(
+        (y_max - y_min) * 0.08,
+        0.1
+    )
 
-    # Regiones sombreadas suaves
-    ax.contourf(xx, yy, Z, levels=[-np.inf, 0, np.inf], colors=['#e0f3f8', '#fee0d2'], alpha=0.55)
+    xx, yy = np.meshgrid(
+        np.linspace(
+            x_min - x_padding,
+            x_max + x_padding,
+            250
+        ),
+        np.linspace(
+            y_min - y_padding,
+            y_max + y_padding,
+            250
+        )
+    )
 
-    # Contornos de decisión y márgenes
+    grid = np.c_[
+        xx.ravel(),
+        yy.ravel()
+    ]
+
+    grid_scaled = scaler.transform(
+        grid
+    )
+
+    decision = svm.decision_function(
+        grid_scaled
+    ).reshape(xx.shape)
+
+    fig, ax = plt.subplots(
+        figsize=(11, 8)
+    )
+
+    ax.contourf(
+        xx,
+        yy,
+        decision,
+        levels=[
+            -np.inf,
+            0,
+            np.inf
+        ],
+        colors=[
+            "#d9edf7",
+            "#f8d7da"
+        ],
+        alpha=0.6
+    )
+
     contours = ax.contour(
-        xx, yy, Z, levels=[-1.0, 0.0, 1.0],
-        linestyles=['--', '-', '--'],
-        colors=['#2b83ba', '#d7191c', '#2b83ba'],
-        linewidths=[1.8, 2.8, 1.8]
+        xx,
+        yy,
+        decision,
+        levels=[-1, 0, 1],
+        colors=[
+            "#2b83ba",
+            "#d7191c",
+            "#2b83ba"
+        ],
+        linestyles=[
+            "--",
+            "-",
+            "--"
+        ],
+        linewidths=[
+            1.5,
+            2.5,
+            1.5
+        ]
     )
+
     ax.clabel(
-        contours, inline=True, fontsize=10,
-        fmt={-1.0: 'Margen (-1)', 0.0: 'Hiperplano Separador f(x)=0', 1.0: 'Margen (+1)'}
+        contours,
+        inline=True,
+        fontsize=9,
+        fmt={
+            -1: "Puntuación -1",
+            0: "Decisión 0",
+            1: "Puntuación +1"
+        }
     )
-
-    # Submuestra limpia de estudiantes
-    np.random.seed(random_state)
-    sample_idx = np.random.choice(len(X), size=min(sample_size, len(X)), replace=False)
-    X_sub = X[sample_idx]
-    y_sub = y_bin[sample_idx]
 
     ax.scatter(
-        X_sub[y_sub == 0, 0], X_sub[y_sub == 0, 1],
-        c='#2b83ba', label='Persistente (Graduado / En curso)',
-        alpha=0.7, edgecolors='k', s=45
+        X[y == 0, 0],
+        X[y == 0, 1],
+        color="#2b83ba",
+        label="No Desertor",
+        alpha=0.65,
+        edgecolors="black",
+        linewidths=0.3,
+        s=35
     )
+
     ax.scatter(
-        X_sub[y_sub == 1, 0], X_sub[y_sub == 1, 1],
-        c='#d7191c', label='Desertor',
-        alpha=0.7, edgecolors='k', s=45
+        X[y == 1, 0],
+        X[y == 1, 1],
+        color="#d7191c",
+        label="Desertor",
+        alpha=0.7,
+        edgecolors="black",
+        linewidths=0.3,
+        s=35
     )
 
-    # Vectores de soporte en el espacio original de variables
-    sv_orig = scaler.inverse_transform(svm.support_vectors_)
-    sv_sample = sv_orig[np.random.choice(len(sv_orig), size=min(60, len(sv_orig)), replace=False)]
+    support_original = scaler.inverse_transform(
+        svm.support_vectors_
+    )
+
     ax.scatter(
-        sv_sample[:, 0], sv_sample[:, 1],
-        s=130, facecolors='none', edgecolors='black', linewidths=2.0,
-        label=f'Vectores de Soporte (Muestra de {len(svm.support_vectors_)} puntos límite)'
+        support_original[:, 0],
+        support_original[:, 1],
+        s=85,
+        facecolors="none",
+        edgecolors="black",
+        linewidths=1,
+        label=(
+            f"Vectores de soporte "
+            f"(n={len(support_original)})"
+        )
     )
 
-    ax.set_title('Frontera de Decisión e Hiperplano SVM en Variables Críticas', fontsize=14, fontweight='bold')
-    ax.set_xlabel('Promedio Académico Acumulado (0.0 - 5.0)', fontsize=12)
-    ax.set_ylabel('Materias Reprobadas (0 - 8)', fontsize=12)
-    ax.legend(loc='upper right', frameon=True, facecolor='white', framealpha=0.92)
+    ax.set_title(
+        "Separación binaria exploratoria con SVM RBF",
+        fontsize=14,
+        fontweight="bold"
+    )
 
-    plt.tight_layout()
+    ax.set_xlabel(features[0])
+    ax.set_ylabel(features[1])
 
-    if output_path is None:
-        FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = FIGURES_DIR / "svm_hiperplano_top2_variables.png"
+    ax.text(
+        0.01,
+        0.01,
+        "Modelo binario independiente. No corresponde al SVM "
+        "multiclase final.",
+        transform=ax.transAxes,
+        fontsize=8,
+        color="dimgray"
+    )
 
-    plt.savefig(output_path, dpi=300)
+    ax.legend(
+        loc="best",
+        fontsize=9
+    )
+
+    fig.tight_layout()
+
+    _save_figure(
+        fig,
+        output_path,
+        "svm_frontera_binaria_dos_variables.png"
+    )
+
     return fig, ax
 
+
+# ============================================================
+# 9. DISTRIBUCIÓN DE PUNTUACIONES DE DECISIÓN
+# ============================================================
 
 def plot_decision_function_distribution(
     df: pd.DataFrame,
     num_cols: Optional[List[str]] = None,
     output_path: Optional[Union[str, Path]] = None,
     random_state: int = 42
-) -> Tuple[plt.Figure, Any]:
+):
     """
-    Figura de interpretabilidad 1D: Distribución de distancias funcionales al hiperplano f(x)
-    y visualización de los márgenes y vectores de soporte.
-    """
-    if num_cols is None:
-        num_cols = ['promedio_academico', 'materias_reprobadas', 'semestre_cursado', 'distancia_hogar_ies_km', 'estrato_socioeconomico']
+    Entrena un SVM RBF binario independiente.
 
-    X = df[num_cols].values
-    y_bin = (df['estado_final'] == 'Desertor').astype(int).values
+    El modelo se ajusta sobre entrenamiento y las puntuaciones
+    se calculan exclusivamente sobre observaciones de prueba.
+
+    No representa las puntuaciones del SVM multiclase definitivo.
+    """
+
+    _validate_target(df)
+
+    if num_cols is None:
+        num_cols = [
+            "promedio_academico",
+            "materias_reprobadas",
+            "semestre_cursado",
+            "distancia_hogar_ies_km",
+            "estrato_socioeconomico"
+        ]
+
+    num_cols = _validate_numeric_columns(
+        df,
+        num_cols
+    )
+
+    data = df[
+        num_cols + ["estado_final"]
+    ].copy()
+
+    for col in num_cols:
+        data[col] = pd.to_numeric(
+            data[col],
+            errors="coerce"
+        )
+
+    data = data.dropna()
+
+    X = data[num_cols].values
+
+    y = (
+        data["estado_final"] == "Desertor"
+    ).astype(int).values
+
+    if np.unique(y).size != 2:
+        raise ValueError(
+            "Se necesitan ambas clases para entrenar el SVM binario."
+        )
+
+    if np.bincount(y).min() < 2:
+        raise ValueError(
+            "Cada clase necesita al menos dos observaciones."
+        )
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.25,
+        random_state=random_state,
+        stratify=y
+    )
 
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
 
-    svm = SVC(kernel='rbf', C=1.0, random_state=random_state)
-    svm.fit(X_scaled, y_bin)
+    X_train_scaled = scaler.fit_transform(
+        X_train
+    )
 
-    dfunc = svm.decision_function(X_scaled)
+    X_test_scaled = scaler.transform(
+        X_test
+    )
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.histplot(dfunc[y_bin == 0], color='#2b83ba', kde=True, label='Estudiantes Persistentes', stat='density', alpha=0.5, ax=ax)
-    sns.histplot(dfunc[y_bin == 1], color='#d7191c', kde=True, label='Estudiantes Desertores', stat='density', alpha=0.5, ax=ax)
+    svm = SVC(
+        kernel="rbf",
+        C=1.0,
+        class_weight="balanced"
+    )
 
-    ax.axvline(0, color='black', linestyle='-', linewidth=2.5, label='Hiperplano Separador f(x) = 0')
-    ax.axvline(1, color='#2b83ba', linestyle='--', linewidth=1.8, label='Margen (+1)')
-    ax.axvline(-1, color='#d7191c', linestyle='--', linewidth=1.8, label='Margen (-1)')
-    ax.axvspan(-1, 1, color='gray', alpha=0.15, label='Zona del Margen y Vectores de Soporte [-1, +1]')
+    svm.fit(
+        X_train_scaled,
+        y_train
+    )
 
-    ax.set_title('Distribución de Distancias Funcionales de Estudiantes al Hiperplano SVM', fontsize=14, fontweight='bold')
-    ax.set_xlabel('Distancia Funcional f(x) = wᵀφ(x) + b (Margen Geométrico)', fontsize=12)
-    ax.set_ylabel('Densidad de Probabilidad de Estudiantes', fontsize=12)
-    ax.legend(loc='upper right', frameon=True, facecolor='white', framealpha=0.95)
+    scores = svm.decision_function(
+        X_test_scaled
+    )
 
-    plt.tight_layout()
+    fig, ax = plt.subplots(
+        figsize=(11, 7)
+    )
 
-    if output_path is None:
-        FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = FIGURES_DIR / "svm_distancia_hiperplano_estudiantes.png"
+    sns.histplot(
+        scores[y_test == 0],
+        color="#2b83ba",
+        label="No Desertor",
+        stat="density",
+        element="step",
+        fill=True,
+        alpha=0.35,
+        bins=30,
+        ax=ax
+    )
 
-    plt.savefig(output_path, dpi=300)
+    sns.histplot(
+        scores[y_test == 1],
+        color="#d7191c",
+        label="Desertor",
+        stat="density",
+        element="step",
+        fill=True,
+        alpha=0.35,
+        bins=30,
+        ax=ax
+    )
+
+    ax.axvline(
+        0,
+        color="black",
+        linestyle="--",
+        linewidth=2,
+        label="Umbral de decisión = 0"
+    )
+
+    ax.set_title(
+        "Distribución de puntuaciones de decisión del SVM RBF binario",
+        fontsize=13,
+        fontweight="bold"
+    )
+
+    ax.set_xlabel(
+        "Puntuación de decisión SVM RBF (binario)"
+    )
+
+    ax.set_ylabel(
+        "Densidad"
+    )
+
+    ax.text(
+        0.01,
+        0.01,
+        "Puntuaciones calculadas sobre el conjunto de prueba "
+        "del modelo binario. No son distancias geométricas.",
+        transform=ax.transAxes,
+        fontsize=8,
+        color="dimgray"
+    )
+
+    ax.legend(
+        loc="best"
+    )
+
+    fig.tight_layout()
+
+    _save_figure(
+        fig,
+        output_path,
+        "svm_puntuaciones_decision_binaria.png"
+    )
+
+    return fig, ax
+
+
+# ============================================================
+# 10. MÉTRICAS DE CLASIFICACIÓN POR CLASE
+# ============================================================
+
+def plot_classification_metrics(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    classes: Optional[List[str]] = None,
+    output_path: Optional[Union[str, Path]] = None
+):
+    """
+    Compara precisión, recall y F1-score de cada clase.
+    Utiliza etiquetas textuales.
+    """
+
+    if classes is None:
+        classes = list(CLASSES)
+
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+
+    if len(y_true) != len(y_pred):
+        raise ValueError(
+            "y_true y y_pred deben tener la misma longitud."
+        )
+
+    if len(y_true) == 0:
+        raise ValueError(
+            "No hay observaciones para evaluar."
+        )
+
+    report = classification_report(
+        y_true,
+        y_pred,
+        labels=classes,
+        output_dict=True,
+        zero_division=0
+    )
+
+    metrics = []
+
+    for label in classes:
+
+        if label not in report:
+            continue
+
+        metrics.append({
+            "Clase": label,
+            "Precisión": report[label]["precision"],
+            "Recall": report[label]["recall"],
+            "F1-score": report[label]["f1-score"]
+        })
+
+    metrics_df = pd.DataFrame(
+        metrics
+    )
+
+    if metrics_df.empty:
+        raise ValueError(
+            "No se encontraron métricas por clase."
+        )
+
+    plot_df = metrics_df.melt(
+        id_vars="Clase",
+        var_name="Métrica",
+        value_name="Valor"
+    )
+
+    fig, ax = plt.subplots(
+        figsize=(12, 7)
+    )
+
+    sns.barplot(
+        data=plot_df,
+        x="Clase",
+        y="Valor",
+        hue="Métrica",
+        palette="Set2",
+        ax=ax
+    )
+
+    ax.set_ylim(
+        0,
+        1.05
+    )
+
+    ax.set_title(
+        "Desempeño del SVM por clase",
+        fontsize=14,
+        fontweight="bold"
+    )
+
+    ax.set_xlabel("Clase")
+    ax.set_ylabel("Valor de la métrica")
+
+    ax.legend(
+        title="Métrica",
+        loc="best"
+    )
+
+    fig.tight_layout()
+
+    _save_figure(
+        fig,
+        output_path,
+        "svm_metricas_por_clase.png"
+    )
+
+    return fig, ax
+
+
+# ============================================================
+# 11. DISTRIBUCIÓN DE RESULTADOS ENTRE TRIALS
+# ============================================================
+
+def plot_trial_score_distributions(
+    results_macro: dict,
+    output_path: Optional[Union[str, Path]] = None,
+    metric_name: str = "F1 macro"
+):
+    """
+    Representa la distribución de resultados entre trials.
+
+    results_macro debe ser el diccionario devuelto por
+    run_multiclass_trials para la métrica F1 macro.
+    """
+
+    if not isinstance(results_macro, dict) or not results_macro:
+        raise ValueError(
+            "results_macro debe ser un diccionario no vacío."
+        )
+
+    records = []
+
+    for method, values in results_macro.items():
+
+        values = np.asarray(
+            values,
+            dtype=float
+        )
+
+        values = values[
+            np.isfinite(values)
+        ]
+
+        for value in values:
+
+            records.append({
+                "Configuración": str(method),
+                "Resultado": float(value)
+            })
+
+    data = pd.DataFrame(
+        records
+    )
+
+    if data.empty:
+        raise ValueError(
+            "No hay resultados numéricos válidos."
+        )
+
+    order = (
+        data.groupby("Configuración")["Resultado"]
+        .median()
+        .sort_values()
+        .index
+        .tolist()
+    )
+
+    fig, ax = plt.subplots(
+        figsize=(14, 8)
+    )
+
+    sns.boxplot(
+        data=data,
+        x="Resultado",
+        y="Configuración",
+        order=order,
+        color="#a6cee3",
+        showfliers=False,
+        ax=ax
+    )
+
+    sns.stripplot(
+        data=data,
+        x="Resultado",
+        y="Configuración",
+        order=order,
+        color="#1f78b4",
+        alpha=0.35,
+        size=3,
+        ax=ax
+    )
+
+    ax.set_title(
+        f"Variabilidad del rendimiento entre trials ({metric_name})",
+        fontsize=14,
+        fontweight="bold"
+    )
+
+    ax.set_xlabel(metric_name)
+    ax.set_ylabel("Configuración")
+
+    fig.tight_layout()
+
+    _save_figure(
+        fig,
+        output_path,
+        "svm_distribucion_f1_trials.png"
+    )
+
+    return fig, ax
+
+
+# ============================================================
+# 12. MÉTRICAS ESPECÍFICAS DE LA CLASE DESERTOR
+# ============================================================
+
+def plot_desertor_metrics(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    output_path: Optional[Union[str, Path]] = None
+):
+    """
+    Muestra precisión, recall y F1-score de la clase Desertor.
+    """
+
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+
+    if len(y_true) != len(y_pred):
+        raise ValueError(
+            "y_true y y_pred deben tener la misma longitud."
+        )
+
+    if len(y_true) == 0:
+        raise ValueError(
+            "No hay observaciones para evaluar."
+        )
+
+    report = classification_report(
+        y_true,
+        y_pred,
+        labels=["Desertor"],
+        output_dict=True,
+        zero_division=0
+    )
+
+    if "Desertor" not in report:
+        raise ValueError(
+            "No se encontraron resultados para la clase Desertor."
+        )
+
+    values = [
+        report["Desertor"]["precision"],
+        report["Desertor"]["recall"],
+        report["Desertor"]["f1-score"]
+    ]
+
+    labels = [
+        "Precisión",
+        "Recall",
+        "F1-score"
+    ]
+
+    fig, ax = plt.subplots(
+        figsize=(9, 6)
+    )
+
+    bars = ax.bar(
+        labels,
+        values,
+        color=[
+            "#80b1d3",
+            "#fb8072",
+            "#8dd3c7"
+        ],
+        edgecolor="black",
+        linewidth=0.5
+    )
+
+    for bar, value in zip(
+        bars,
+        values
+    ):
+
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            value + 0.02,
+            f"{value:.4f}",
+            ha="center",
+            va="bottom",
+            fontweight="bold"
+        )
+
+    ax.set_ylim(
+        0,
+        1.12
+    )
+
+    ax.set_title(
+        "Desempeño del modelo en la clase Desertor",
+        fontsize=14,
+        fontweight="bold"
+    )
+
+    ax.set_ylabel(
+        "Valor de la métrica"
+    )
+
+    ax.text(
+        0.5,
+        -0.16,
+        "El recall indica qué proporción de los desertores reales "
+        "fue identificada correctamente.",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=9,
+        color="dimgray"
+    )
+
+    fig.tight_layout()
+
+    _save_figure(
+        fig,
+        output_path,
+        "svm_metricas_clase_desertor.png"
+    )
+
     return fig, ax

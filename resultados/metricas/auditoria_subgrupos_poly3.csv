@@ -1,0 +1,10 @@
+﻿Variable,Subgrupo,N Desertores,Recall (Desertor)
+sexo,Hombre,348,0.9022988505747126
+sexo,Mujer,425,0.9129411764705883
+zona_residencia,Rural,144,0.9375
+zona_residencia,Urbana,629,0.9014308426073132
+sector_ies,Privado,403,0.9057071960297767
+sector_ies,Publico,370,0.9108108108108108
+metodologia,Distancia tradicional,131,0.9007633587786259
+metodologia,Presencial,551,0.9074410163339383
+metodologia,Virtual,91,0.9230769230769231

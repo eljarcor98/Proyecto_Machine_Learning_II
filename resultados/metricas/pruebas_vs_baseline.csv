@@ -1,0 +1,15 @@
+metrica,modelo,mejora_media,p_bruto,p_bonferroni
+f1_weighted,LogReg ajustada,0.002867488715913543,1.0,1.0
+f1_weighted,SVM lineal,0.009042745268764326,0.5,1.0
+f1_weighted,SVM polinómica,6.490705178441303e-05,1.0,1.0
+f1_weighted,SVM RBF,-0.016935109824884775,0.25,1.0
+f1_weighted,Random Forest,0.01758145101588937,0.25,1.0
+f1_weighted,Gradient Boosting,0.017018584585197782,0.5,1.0
+f1_weighted,XGBoost,0.010176998431991416,0.25,1.0
+f1_desertor,LogReg ajustada,0.06817322714469899,0.25,1.0
+f1_desertor,SVM lineal,0.021839763273383106,0.5,1.0
+f1_desertor,SVM polinómica,0.08350483055032866,0.25,1.0
+f1_desertor,SVM RBF,0.08562912184480188,0.25,1.0
+f1_desertor,Random Forest,0.03047423197158433,0.25,1.0
+f1_desertor,Gradient Boosting,0.04048333423548398,0.25,1.0
+f1_desertor,XGBoost,-0.0011995900534504018,0.75,1.0
