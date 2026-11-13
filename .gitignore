@@ -34,5 +34,29 @@ scratch/
 *.fdb_latexmk
 *.synctex.gz
 *.synctex*
+*.nav
+*.snm
+*.vrb
+
+# Microsoft Office temporary files
+~$*
+*.tmp
+
+# Archivos de configuración interna del asistente
+GEMINI.md
+
+# Presentación de referencia externa
+Presentacion_Clarios.pptx
+
+# Guiones y fichas técnicas de sustentación (uso interno del equipo)
+*guion*
+*Guion*
+*GUION*
+*ficha*
+*Ficha*
+
+# Copia de presentación en raíz (la versión oficial está en Documentos/presentacion/)
+/Presentacion_SVM_Desercion.pptx
+
 
 
