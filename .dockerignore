@@ -1,0 +1,22 @@
+.git/
+.venv/
+env/
+venv/
+__pycache__/
+*.py[cod]
+*.pdf
+*.docx
+*.zip
+*.tar.gz
+documentos/
+Documentos/
+avances nicolas/
+avances sara/
+scratch/
+GEMINI.md
+*guion*
+*Guion*
+*GUION*
+*ficha*
+*Ficha*
+Presentacion*
